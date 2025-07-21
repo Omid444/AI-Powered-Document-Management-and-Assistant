@@ -1,21 +1,64 @@
-from fastapi import FastAPI, Request
+from http.client import HTTPException
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
 from fastapi import FastAPI
+import models.schemas
+import services.auth
+from models.models import User
+from sqlalchemy.orm import Session
+from db.database import SessionLocal, session
 import uvicorn
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="../../static"), name="static")
-templates = Jinja2Templates(directory="../../templates")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent #Back to root of project
+app.mount("/static", StaticFiles(directory=BASE_DIR/"static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR/"templates")
+
+def get_db():
+    """
+    Creates a new database session and ensures it is properly closed after use.
+
+    This function is intended to be used as a dependency in FastAPI routes.
+    It yields a SQLAlchemy session (`db`) that can be used to interact with the database.
+    After the request is completed, the session is automatically closed to free resources.
+
+    Yields:
+        Session: An active SQLAlchemy session instance.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "message": "Hello, World!"})
 
-# fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}]
-#
+
+
+@app.get("/signup", response_class=HTMLResponse)
+def get_signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
+@app.post("/signup")
+def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
+    db_email = db.query(models.models.User).filter(models.models.User.email == user.email).first()
+    if db_email:
+        raise HTTPException(status_code="400", detail="Email already used")
+    hashed_password = services.auth.hash_password(user.password)
+    new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "User created successfully", "email": user.email}
+
 # @app.get("/users/me")
 # async def read_user_me():
 #     return {"user_id": "the current user"}
@@ -31,5 +74,7 @@ async def read_root(request: Request):
 # async def read_item(skip: int = 0, limit: int = 10):
 #     return fake_items_db[skip : skip + limit]
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="127.0.0.1", port=8000)
+
+# uvicorn app.api.app:app --reload
