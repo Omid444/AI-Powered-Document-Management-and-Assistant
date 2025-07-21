@@ -14,6 +14,9 @@ templates = Jinja2Templates(directory="../../templates")
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "message": "Hello, World!"})
 
+
+
+
 # fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}]
 #
 # @app.get("/users/me")
