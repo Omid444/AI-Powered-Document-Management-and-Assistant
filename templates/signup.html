@@ -4,16 +4,17 @@
 {% block title %}Signup{% endblock %}
 
 {% block content %}
-    <h1>Signup Form</h1>
-    <form id="signup-form">
-        <input type="text" id="first_name" placeholder="First Name" required />
-        <input type="text" id="last_name" placeholder="Last Name" required />
-        <input type="email" id="email" placeholder="Email" required />
-        <input type="password" id="password" placeholder="Password" required />
-        <button type="submit">Signup</button>
-    </form>
+<h1>Signup Form</h1>
+<form id="signup-form" onsubmit="signup(event)">
+    <input type="text" id="first_name" placeholder="First Name" required/>
+    <input type="text" id="last_name" placeholder="Last Name" required/>
+    <input type="email" id="email" placeholder="Email" required/>
+    <input type="password" id="password" placeholder="Password" required/>
+    <button type="submit">Signup</button>
+</form>
+
 {% endblock %}
 
 {% block scripts %}
-    <script src="{{ url_for('static', path='js/signup.js') }}"></script>
+<script src="{{ url_for('static', path='js/signup.js') }}"></script>
 {% endblock %}
