@@ -49,7 +49,7 @@ def get_signup_page(request: Request):
 
 @app.post("/signup")
 def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User).filter(models.models.User.email == user.email).first()
+    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
     if db_email:
         raise HTTPException(status_code="400", detail="Email already used")
     hashed_password = services.auth.hash_password(user.password)
@@ -60,8 +60,20 @@ def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     return {"message": "User created successfully", "email": user.email}
 
 
-# @app.post("/login")
-# def login(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
+@app.get("/signup", response_class=HTMLResponse)
+def get_signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
+@app.post("/login")
+def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
+    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
+    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.email == user.email).scalar()
+    is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
+    if not db_email or not is_pass_verified:
+        raise HTTPException(status_code="401", detail="Email or Password is incorrect")
+    access_token = services.auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # @app.get("/users/me")

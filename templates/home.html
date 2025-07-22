@@ -1,0 +1,16 @@
+<!-- templates/signup.html -->
+{% extends "base.html" %}
+
+{% block title %}Signup{% endblock %}
+
+{% block content %}
+    <h1>Home</h1>
+    <div class="nav-buttons">
+        <button class="btn" id="signup-btn">Signup</button>
+        <button class="btn" id="login-btn">Login</button>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', path='js/signup.js') }}"></script>
+{% endblock %}
