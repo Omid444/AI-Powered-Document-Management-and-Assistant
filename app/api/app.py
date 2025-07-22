@@ -38,7 +38,7 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("base.html", {"request": request, "message": "Hello, World!"})
+    return templates.TemplateResponse("home.html", {"request": request, "message": "Hello, World!"})
 
 
 
@@ -60,9 +60,9 @@ def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     return {"message": "User created successfully", "email": user.email}
 
 
-@app.get("/signup", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse)
 def get_signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.post("/login")
