@@ -38,7 +38,7 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "message": "Hello, World!"})
+    return templates.TemplateResponse("base.html", {"request": request, "message": "Hello, World!"})
 
 
 
@@ -58,6 +58,11 @@ def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return {"message": "User created successfully", "email": user.email}
+
+
+# @app.post("/login")
+# def login(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
+
 
 # @app.get("/users/me")
 # async def read_user_me():
