@@ -10,7 +10,7 @@ import services.auth
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-import uvicorn
+
 
 app = FastAPI()
 
@@ -58,11 +58,6 @@ def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return {"message": "User created successfully", "email": user.email}
-
-
-@app.get("/login", response_class=HTMLResponse)
-def get_signup_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.post("/login")
