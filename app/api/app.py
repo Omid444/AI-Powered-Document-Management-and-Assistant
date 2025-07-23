@@ -10,7 +10,7 @@ import services.auth
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-import uvicorn
+
 
 app = FastAPI()
 
@@ -38,7 +38,7 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "message": "Hello, World!"})
+    return templates.TemplateResponse("home.html", {"request": request, "message": "Hello, World!"})
 
 
 
@@ -49,7 +49,7 @@ def get_signup_page(request: Request):
 
 @app.post("/signup")
 def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User).filter(models.models.User.email == user.email).first()
+    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
     if db_email:
         raise HTTPException(status_code="400", detail="Email already used")
     hashed_password = services.auth.hash_password(user.password)
@@ -58,6 +58,18 @@ def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return {"message": "User created successfully", "email": user.email}
+
+
+@app.post("/login")
+def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
+    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
+    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.email == user.email).scalar()
+    is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
+    if not db_email or not is_pass_verified:
+        raise HTTPException(status_code="401", detail="Email or Password is incorrect")
+    access_token = services.auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 # @app.get("/users/me")
 # async def read_user_me():

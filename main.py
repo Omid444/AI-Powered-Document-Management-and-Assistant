@@ -1,6 +1,8 @@
 from db.database import engine, Base
 from models.models import User
 from dotenv import load_dotenv
+from app.api.app import app
+import uvicorn
 import os
 
 # load from .env
@@ -19,3 +21,5 @@ else:
 Base.metadata.create_all(bind=engine)
 
 
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
