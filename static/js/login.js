@@ -1,3 +1,5 @@
+//import {loadAccountPage} from './account.js'
+
 async function login(event) {
     if (event) {
         event.preventDefault();
@@ -11,15 +13,33 @@ async function login(event) {
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({email, password })
+        body: JSON.stringify({ email, password })
     });
 
     if (response.ok) {
         const data = await response.json();
-        alert("login successful!");
-        console.log(data);
+        console.log("Response data:", data);
+        console.log("About to store token:", data.access_token);
+
+        console.log("Stored token:", localStorage.getItem("access_token"));
+
+        if (data.access_token) {
+            // Save Token in storage
+            localStorage.setItem("access_token", data.access_token);
+
+            console.log("Access Token:", data.access_token);
+
+            alert("Login successful!");
+
+            // Small delay
+            setTimeout(() => {
+                //loadAccountPage() ;
+                window.location.href = "/items";
+            }, 200);
+        } else {
+            alert("Login succeeded but no token received.");
+        }
     } else {
-        const error = await response.text();
-        alert("login failed: " + error);
+        alert("Login failed.");
     }
 }
