@@ -23,10 +23,10 @@ export async function loadAccountPage() {
         }
 
         const html = await response.text();
-/*
+
         document.open();
         document.write(html);
-        document.close();*/
+        document.close();
 
     } catch (error) {
         console.error("Access denied:", error);

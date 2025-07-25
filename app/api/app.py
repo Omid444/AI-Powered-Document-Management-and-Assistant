@@ -77,7 +77,7 @@ async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/account", response_class=HTMLResponse)
+@app.get("/account")
 async def account(request: Request, authorization: str = Header(None, alias="Authorization")):
     print("Authorization:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
@@ -93,12 +93,13 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
-    #return templates.TemplateResponse("account.html", {"request": request, "email": email})
-    return templates.TemplateResponse("test.html")
+    return templates.TemplateResponse("account.html", {"request": request, "email": email})
+
 
 
 @app.get("/items")
-async def read_items(request: Request):
+async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print(authorization)
     return templates.TemplateResponse("test.html",{"request": request})
 # @app.get("/users/me")
 # async def read_user_me():

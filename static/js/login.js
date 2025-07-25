@@ -1,4 +1,4 @@
-//import {loadAccountPage} from './account.js'
+import {loadAccountPage} from './account.js'
 
 async function login(event) {
     if (event) {
@@ -33,8 +33,8 @@ async function login(event) {
 
             // Small delay
             setTimeout(() => {
-                //loadAccountPage() ;
-                window.location.href = "/items";
+                loadAccountPage() ;
+                //window.location.href = "/items";
             }, 200);
         } else {
             alert("Login succeeded but no token received.");
@@ -43,3 +43,5 @@ async function login(event) {
         alert("Login failed.");
     }
 }
+
+window.login =login;
