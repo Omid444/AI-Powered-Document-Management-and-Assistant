@@ -1,6 +1,4 @@
 from http.client import HTTPException
-from typing import Annotated
-
 from fastapi import FastAPI, Request, Depends, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from jose import JWTError
@@ -54,7 +52,7 @@ async def get_signup_page(request: Request):
 async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
     if db_email:
-        raise HTTPException(status_code=400, detail="Email already used")
+        raise HTTPException(status_code=400, detail="Username already used")
     hashed_password = services.auth.hash_password(user.password)
     new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, hashed_password=hashed_password)
     db.add(new_user)
