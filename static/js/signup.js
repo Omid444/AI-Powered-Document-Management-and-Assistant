@@ -6,6 +6,7 @@ async function signup(event) {
     const first_name = document.getElementById("first_name").value;
     const last_name = document.getElementById("last_name").value;
     const email = document.getElementById("email").value;
+    const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
 
     const response = await fetch("/signup", {
@@ -13,7 +14,7 @@ async function signup(event) {
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ first_name, last_name, email, password })
+        body: JSON.stringify({ first_name, last_name, email,username, password })
     });
 
     if (response.ok) {

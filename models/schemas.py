@@ -4,8 +4,9 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
     email: str
+    username: str
     password: str
 
 class UserLogin(BaseModel):
-    email: str
+    username: str
     password: str

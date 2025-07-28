@@ -50,11 +50,11 @@ async def get_signup_page(request: Request):
 
 @app.post("/signup")
 async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
+    db_email = db.query(models.models.User.username).filter(models.models.User.email == user.username).scalar()
     if db_email:
         raise HTTPException(status_code=400, detail="Username already used")
     hashed_password = services.auth.hash_password(user.password)
-    new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, hashed_password=hashed_password)
+    new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -63,14 +63,14 @@ async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db))
 
 @app.post("/login")
 async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User.email).filter(models.models.User.email == user.email).scalar()
-    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.email == user.email).scalar()
-    if not db_email or db_hashed_password is None:
-        raise HTTPException(status_code=401, detail="Email or Password is incorrect")
+    db_username = db.query(models.models.User.username).filter(models.models.User.username == user.username).scalar()
+    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.username == user.username).scalar()
+    if not db_username or db_hashed_password is None:
+        raise HTTPException(status_code=401, detail="Username or Password is incorrect")
     is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
     if not is_pass_verified:
-        raise HTTPException(status_code=401, detail="Email or Password is incorrect")
-    access_token = services.auth.create_access_token(data={"sub": user.email})
+        raise HTTPException(status_code=401, detail="Username or Password is incorrect")
+    access_token = services.auth.create_access_token(data={"sub": user.username})
     print("access_token", access_token)
     return {"access_token": access_token, "token_type": "bearer"}
 
