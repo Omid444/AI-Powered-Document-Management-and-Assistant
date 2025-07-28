@@ -76,7 +76,8 @@ async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
 
 
 @app.get("/account")
-async def account(request: Request, authorization: str = Header(None, alias="Authorization")):
+async def account(request: Request, authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
+    #user_firstname = db.query(models.models.User).filter(models.models.User.username == user.username)
     print("Authorization:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -84,14 +85,14 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     token = authorization.split(" ")[1]
 
     try:
-        email = services.auth.verify_token(token)
-        print("Email from token:", email)
-        if email is None:
+        username = services.auth.verify_token(token)
+        print("Email from token:", username)
+        if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
-
-    return templates.TemplateResponse("account.html", {"request": request, "email": email})
+    user_firstname = db.query(models.models.User.first_name).filter(models.models.User.username == username).scalar()
+    return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
 
 
 
