@@ -95,6 +95,11 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
 
 
+@app.route("/chatbot")
+def chatbot(request: Request):
+    return templates.TemplateResponse("chatbot.html",{"request": request})
+
+
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
