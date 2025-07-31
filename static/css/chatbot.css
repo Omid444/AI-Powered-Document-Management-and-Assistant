@@ -8,17 +8,22 @@
 }
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  margin: 0;
+  padding: 0;
   background: linear-gradient(#f0f8ff, #7cb9e8);
 }
 
+/* حالت مخفی‌شده یا مینیمایز */
+.chatbot-popup.minimized {
+  height: 60px;
+  overflow: hidden;
+  transition: height 0.3s ease;
+}
+
 .chatbot-popup {
-  width: 420px;
+  /*width: 420px;*/
   background: #fff;
-  border-radius: 15px;
+  /*border-radius: 15px;*/
   overflow: hidden;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   animation: fadeIn 0.6s ease;
@@ -76,8 +81,9 @@ body {
 }
 
 .chat-body {
+  height: 405px;
   padding: 16px;
-  max-height: 400px;
+  max-height: 600px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -87,18 +93,19 @@ body {
 .message {
   display: flex;
   flex-direction: column;
-  max-width: 80%;
+  max-width: 90%;
 }
 
 .bot-message .text {
   background: #e0e0e0;
   align-self: flex-start;
+  margin-right: auto;
 }
 
 .user-message .text {
   background: #cce5ff;
   align-self: flex-end;
-  margin-left: auto;
+  margin-left:auto;
 }
 
 .text {

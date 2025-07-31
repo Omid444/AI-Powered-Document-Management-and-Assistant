@@ -14,7 +14,7 @@ async function signup(event) {
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ first_name, last_name, email,username, password })
+        body: JSON.stringify({ first_name, last_name, email, username, password })
     });
 
     if (response.ok) {

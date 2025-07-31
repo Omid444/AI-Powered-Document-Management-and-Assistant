@@ -31,3 +31,31 @@ li a:hover:not(.active) {
 .active {
   background-color: #04AA6D;
 }
+
+.chatbot-frame {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  transition: width 0.3s ease, height 0.3s ease;
+  border: none;
+  z-index: 9999;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.chatbot-frame:hover {
+  width: 500px;
+  height: 600px;
+  border-radius: 12px;
+}
+
+/*This is for let the chatbot be opened even after mouse is gone*/
+/*
+.chatbot-frame.open {
+  width: 500px;
+  height: 900px;
+  border-radius: 12px;
+}*/
