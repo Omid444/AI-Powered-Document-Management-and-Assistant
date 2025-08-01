@@ -1,6 +1,6 @@
 from http.client import HTTPException
 from fastapi import FastAPI, Request, Depends, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from jose import JWTError
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -95,6 +95,16 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
 
 
+@app.get("/chatbot")
+async def chatbot(request: Request):
+    return templates.TemplateResponse("chatbot.html",{"request": request})
+
+
+@app.post("/api/chat")
+async def chat(request: Request):
+    data = await request.json()
+    user_message = data.get("message", "")
+    return JSONResponse(content={"reply": f"پاسخ سرور به: {user_message}"})
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
