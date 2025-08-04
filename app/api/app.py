@@ -97,12 +97,19 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
 
 
 @app.post("/api/chat")
-async def chat(request: Request):
+async def chat(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print("Authorization in api/chat:", authorization)
     data = await request.json()
     print(data)
     user_message = data.get("message", "")
     reply = services.open_ai_connection.ask_ai(user_message)
-    return JSONResponse(content={"reply": f"{reply} {user_message}"})
+    return JSONResponse(content={"reply": f"{reply}"})
+
+
+@app.get("/chatbot")
+async def chatbot(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print("Authorization in chatbot:", authorization)
+    return templates.TemplateResponse("chatbot.html",{"request": request})
 
 
 @app.get("/items")

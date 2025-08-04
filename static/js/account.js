@@ -22,10 +22,30 @@ export async function loadAccountPage() {
     document.open();
     document.write(html);
     document.close();
-    
+
+    // دریافت ارجاع به iframe و دکمه جدید
     const iframe = document.querySelector(".chatbot-frame");
     const openChatbotButton = document.getElementById("open-chatbot-button");
 
+    // 👇 تغییرات برای ارسال مطمئن‌تر توکن
+    if (iframe && iframe.contentWindow && token) {
+        console.log("✅ Attempting to send token with a small delay.");
+        // یک تأخیر کوتاه اضافه می‌کنیم تا iframe کاملاً آماده دریافت پیام شود.
+        setTimeout(() => {
+            iframe.contentWindow.postMessage({ token: token }, "*");
+            console.log("✅ Token sent to iframe via postMessage with a small delay");
+        }, 200); // 100ms تأخیر
+    }
+
+    // همچنان شنونده load را به عنوان یک راه حل پشتیبان نگه می‌داریم.
+    iframe.addEventListener("load", () => {
+        if (token && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ token: token }, "*");
+            console.log("✅ Token sent to iframe via postMessage on load event");
+        }
+    });
+
+    // 👇 بخش اول: شنونده برای پیام‌های ارسالی از داخل iframe
     window.addEventListener("message", (event) => {
       if (event.data && event.data.toggle) {
         console.log("✔️ Message received from chatbot! Toggling iframe class.");
@@ -38,6 +58,7 @@ export async function loadAccountPage() {
       }
     });
 
+    // 👇 بخش دوم: شنونده برای کلیک روی دکمه باز کردن چت‌بات
     if (openChatbotButton) {
         openChatbotButton.addEventListener("click", () => {
             console.log("✔️ Open button clicked! Maximizing chatbot.");

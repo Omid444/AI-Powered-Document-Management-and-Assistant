@@ -1,3 +1,18 @@
+console.log("✅ Chatbot.js loaded!");
+console.log("✅ Iframe:", window.location.origin);
+
+let token = null; // توکن به عنوان یک متغیر سراسری تعریف می‌شود.
+
+// این شنونده پیام به محض دریافت توکن، آن را ذخیره می‌کند.
+window.addEventListener("message", (event) => {
+  // اگر event.data وجود داشته باشد و شامل توکن باشد.
+  if (event.data && event.data.token) {
+    token = event.data.token;
+    console.log("✅ Token received from parent:", token);
+    localStorage.setItem("access_token", token);
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector(".chat-form");
   const input = document.querySelector(".message-input");
@@ -62,10 +77,19 @@ document.addEventListener("DOMContentLoaded", () => {
       addUserMessage(message);
       input.value = "";
 
+      // ❗ نکته مهم: در اینجا از متغیر سراسری token استفاده می‌شود.
+      // همچنین یک بررسی وجود دارد تا مطمئن شویم توکن خالی نیست.
+      if (!token) {
+          console.error("❌ Token not available. Cannot send message.");
+          addBotMessage("❌: خطا: توکن احراز هویت در دسترس نیست. لطفا صفحه را رفرش کنید.");
+          return;
+      }
+
       fetch("/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+           Authorization: `Bearer ${token}`,
+           "Content-Type": "application/json"
         },
         body: JSON.stringify({ message: message })
       })
@@ -90,6 +114,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // دکمه فایل هنوز پیاده‌سازی نشده
   attachButton.addEventListener("click", () => {
     alert("🚧 انتخاب فایل هنوز پیاده‌سازی نشده.");
-
   });
 });
