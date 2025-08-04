@@ -90,5 +90,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // دکمه فایل هنوز پیاده‌سازی نشده
   attachButton.addEventListener("click", () => {
     alert("🚧 انتخاب فایل هنوز پیاده‌سازی نشده.");
+
   });
 });

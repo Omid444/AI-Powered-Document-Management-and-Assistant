@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from fastapi import FastAPI
 import models.schemas
-import services.auth
+import services.auth, services.open_ai_connection
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
@@ -95,32 +95,22 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
 
 
-@app.get("/chatbot")
-async def chatbot(request: Request):
-    return templates.TemplateResponse("chatbot.html",{"request": request})
-
 
 @app.post("/api/chat")
 async def chat(request: Request):
     data = await request.json()
+    print(data)
     user_message = data.get("message", "")
-    return JSONResponse(content={"reply": f"پاسخ سرور به: {user_message}"})
+    reply = services.open_ai_connection.ask_ai(user_message)
+    return JSONResponse(content={"reply": f"{reply} {user_message}"})
+
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
     print(authorization)
     return templates.TemplateResponse("test.html",{"request": request})
-# @app.get("/users/me")
-# async def read_user_me():
-#     return {"user_id": "the current user"}
-#
-#
-# @app.get("/users/{user_id}")
-# async def read_user(user_id: str):
-#     return {"user_id": user_id}
-#
-#
-#
+
+
 # @app.get("/items/")
 # async def read_item(skip: int = 0, limit: int = 10):
 #     return fake_items_db[skip : skip + limit]
