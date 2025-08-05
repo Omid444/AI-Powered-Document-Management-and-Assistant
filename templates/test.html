@@ -1,2 +1,33 @@
-test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload a File</title>
+</head>
+<body>
 
+  <button id="upload-btn">Upload File</button>
+  <input type="file" id="file-input" style="display: none;">
+  <p id="file-name"></p>
+
+  <script>
+    const uploadBtn = document.getElementById("upload-btn");
+    const fileInput = document.getElementById("file-input");
+    const fileNameDisplay = document.getElementById("file-name");
+
+    uploadBtn.addEventListener("click", () => {
+      fileInput.click(); // باز کردن پنجره انتخاب فایل
+    });
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (file) {
+        fileNameDisplay.textContent = `Selected file: ${file.name}`;
+      } else {
+        fileNameDisplay.textContent = "No file selected.";
+      }
+    });
+  </script>
+
+</body>
+</html>
