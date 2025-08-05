@@ -21,6 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const attachButton = document.querySelector(".chat-controls button:nth-child(2)");
   const sendButton = document.querySelector(".chat-controls button:nth-child(3)");
 
+  const fileInput = document.getElementById("file-input")
+  const fileNameDisplay = document.getElementById("file-name");
+
   // اینجا، قبل از اضافه کردن شنونده، مطمئن می‌شویم که دکمه وجود دارد.
   const closeButton = document.getElementById("close-chatbot");
   if (closeButton) {
@@ -113,6 +116,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // دکمه فایل هنوز پیاده‌سازی نشده
   attachButton.addEventListener("click", () => {
-    alert("🚧 انتخاب فایل هنوز پیاده‌سازی نشده.");
+    //alert("🚧 انتخاب فایل هنوز پیاده‌سازی نشده.");
+
+    fileInput.click();
+    console.log("fileInput", fileInput)
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) {
+        fileNameDisplay.textContent = `${file.name}`;
+      } else {
+        fileNameDisplay.textContent = 'No file has been selected';
+      }
+    });
   });
 });
