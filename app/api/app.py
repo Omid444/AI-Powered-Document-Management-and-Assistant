@@ -11,6 +11,7 @@ import services.auth, services.open_ai_connection
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
+from services.summarizer import extract_txt
 import uvicorn
 
 app = FastAPI()
@@ -116,8 +117,8 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
 
 @app.post("/api/file_upload")
 async def upload(file: UploadFile = File(...)):
-    content = await file.read()
-    print(content)
+    text = extract_txt(file.file)
+    print(text)
     return JSONResponse(content={"reply": file.filename })
 
 

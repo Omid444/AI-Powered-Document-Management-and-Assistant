@@ -108,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!token) {
       console.error("❌ Token not available. Cannot send message.");
-      addBotMessage("❌: خطا: توکن احراز هویت در دسترس نیست. لطفا صفحه را رفرش کنید.");
+      addBotMessage("❌: Invalid Token please refresh the page.");
       return;
     }
 
@@ -179,6 +179,6 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedFile = null;
       }
     }
-    // اگر نه فایلی انتخاب شده و نه پیامی وارد شده باشد، کاری انجام نمی‌دهیم.
+
   });
 });
