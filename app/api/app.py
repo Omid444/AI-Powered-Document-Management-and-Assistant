@@ -1,5 +1,5 @@
 from http.client import HTTPException
-from fastapi import FastAPI, Request, Depends, Header, HTTPException
+from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from jose import JWTError
 from fastapi.staticfiles import StaticFiles
@@ -110,6 +110,15 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
 async def chatbot(request: Request, authorization: str = Header(None, alias="Authorization")):
     print("Authorization in chatbot:", authorization)
     return templates.TemplateResponse("chatbot.html",{"request": request})
+
+
+
+
+@app.post("/api/file_upload")
+async def upload(file: UploadFile = File(...)):
+    content = await file.read()
+    print(content)
+    return JSONResponse(content={"reply": file.filename })
 
 
 @app.get("/items")

@@ -1,8 +1,10 @@
 console.log("✅ Chatbot.js loaded!");
 console.log("✅ Iframe:", window.location.origin);
 
-let token = null; // توکن به عنوان یک متغیر سراسری تعریف می‌شود.
+let token = null;
+let selectedFile = null;
 
+// این شنونده پیام به محض دریافت توکن، آن را ذخیره می‌کند.
 window.addEventListener("message", (event) => {
   if (event.data && event.data.token) {
     token = event.data.token;
@@ -19,8 +21,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector(".chat-form");
   const input = document.querySelector(".message-input");
   const chatBody = document.querySelector(".chat-body");
-  const attachButton = document.querySelector(".chat-controls button:nth-child(2)");
-  const sendButton = document.querySelector(".chat-controls button:nth-child(3)");
+
+  //  تغییر انتخابگر دکمه پیوست فایل به ID جدید
+  const attachButton = document.getElementById("upload-btn");
+
+  //  انتخاب دکمه ارسال با ID یا type
+  const sendButton = document.querySelector(".chat-controls button[type='submit']");
+
   const fileInput = document.getElementById("file-input");
   const fileNameDisplay = document.getElementById("file-name");
   const closeButton = document.getElementById("close-chatbot");
@@ -77,63 +84,101 @@ document.addEventListener("DOMContentLoaded", () => {
     scrollToBottom();
   }
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const message = input.value.trim();
-    if (message !== "") {
-      addUserMessage(message);
-      input.value = "";
-
-      if (!token) {
-        console.error("❌ Token not available. Cannot send message.");
-        addBotMessage("❌: خطا: توکن احراز هویت در دسترس نیست. لطفا صفحه را رفرش کنید.");
-        return;
-      }
-
-      fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message: message })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("پاسخ نامعتبر از سرور");
-        return res.json();
-      })
-      .then(data => {
-        if (data.reply) {
-          addBotMessage(data.reply);
-        } else {
-          addBotMessage("🤖: پاسخی از سرور دریافت نشد.");
-        }
-      })
-      .catch(err => {
-        console.error("خطا:", err);
-        addBotMessage("❌ خطا در ارتباط با سرور.");
-      });
-    }
-  });
-
+  // Event listener for the attach button to open file input
   attachButton.addEventListener("click", () => {
     fileInput.click();
     console.log("fileInput", fileInput);
+  });
 
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      if (file) {
-        fileNameDisplay.textContent = `${file.name}`;
-      } else {
-        fileNameDisplay.textContent = "No file has been selected";
-      }
+  // Event listener for when a file is selected
+  fileInput.addEventListener("change", () => {
+    selectedFile = fileInput.files[0]; // Update the global selectedFile variable
+    if (selectedFile) {
+      fileNameDisplay.textContent = `${selectedFile.name}`;
+    } else {
+      fileNameDisplay.textContent = "";
+    }
+  });
 
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        if (file) {
-          addFileName(`${file.name}`);
+  // ❗ تنها یک شنونده برای ارسال فرم
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault(); // جلوگیری از ارسال پیش‌فرض فرم
+
+    const message = input.value.trim();
+
+    if (!token) {
+      console.error("❌ Token not available. Cannot send message.");
+      addBotMessage("❌: خطا: توکن احراز هویت در دسترس نیست. لطفا صفحه را رفرش کنید.");
+      return;
+    }
+
+    // اگر پیامی در فیلد ورودی وجود دارد، اولویت با ارسال پیام است
+    if (message !== "") {
+      addUserMessage(message);
+      input.value = ""; // پاک کردن ورودی پیام
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message: message })
+        });
+
+        if (!res.ok) throw new Error("No response from server");
+        const data = await res.json();
+        if (data.reply) {
+          addBotMessage(data.reply);
+        } else {
+          addBotMessage("No response from server");
         }
-      });
-    });
+      } catch (err) {
+        console.error("Error:", err);
+        addBotMessage("❌ Error in connecting server");
+      }
+      // پس از ارسال پیام متنی، اگر فایلی هم انتخاب شده بود، آن را پاک می‌کنیم
+      // تا در ارسال بعدی فقط پیام متنی جدید (یا فایل جدید) ارسال شود.
+      if (selectedFile) {
+        fileNameDisplay.textContent = "";
+        fileInput.value = "";
+        selectedFile = null;
+      }
+    }
+    // اگر پیامی در فیلد ورودی وجود ندارد، اما فایلی انتخاب شده است، فایل را ارسال می‌کنیم
+    else if (selectedFile) {
+      addFileName(`${selectedFile.name}`); // نمایش نام فایل در چت
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      try {
+        const res = await fetch("/api/file_upload", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData
+        });
+
+        if (!res.ok) throw new Error("Invalid server response for file upload");
+        const data = await res.json();
+        if (data.reply) {
+          addBotMessage(data.reply);
+        } else {
+          addBotMessage("No response from server");
+        }
+      } catch (err) {
+        console.error("Error in uploading file:", err);
+        addBotMessage("❌ Server connection error");
+      } finally {
+        //  پس از ارسال فایل (موفق یا ناموفق)، اطلاعات فایل را پاک می‌کنیم
+        fileNameDisplay.textContent = "";
+        fileInput.value = "";
+        selectedFile = null;
+      }
+    }
+    // اگر نه فایلی انتخاب شده و نه پیامی وارد شده باشد، کاری انجام نمی‌دهیم.
   });
 });
