@@ -1,5 +1,5 @@
 from http.client import HTTPException
-from fastapi import FastAPI, Request, Depends, Header, HTTPException
+from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from jose import JWTError
 from fastapi.staticfiles import StaticFiles
@@ -7,10 +7,11 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from fastapi import FastAPI
 import models.schemas
-import services.auth
+import services.auth, services.open_ai_connection
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
+from services.summarizer import extract_txt
 import uvicorn
 
 app = FastAPI()
@@ -95,32 +96,44 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
 
 
+
+@app.post("/api/chat")
+async def chat(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print("Authorization in api/chat:", authorization)
+    data = await request.json()
+    print(data)
+    user_message = data.get("message", "")
+    reply = services.open_ai_connection.ask_ai(user_message)
+    return JSONResponse(content={"reply": f"{reply}"})
+
+
 @app.get("/chatbot")
-async def chatbot(request: Request):
+async def chatbot(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print("Authorization in chatbot:", authorization)
     return templates.TemplateResponse("chatbot.html",{"request": request})
 
 
-@app.post("/api/chat")
-async def chat(request: Request):
-    data = await request.json()
-    user_message = data.get("message", "")
-    return JSONResponse(content={"reply": f"پاسخ سرور به: {user_message}"})
+
+
+@app.post("/api/file_upload")
+async def upload(file: UploadFile = File(...)):
+    text = extract_txt(file.file)
+    order = (" at first explains in two or fewer lines about this text. It is a document belongs to me"
+             "summarize this tex for me if document more than 10 line and. do not change text in summary"
+             "to much but make it more clear and easy to understand and remember always write it "
+             "in second person format")
+    final_text = order + "\n" + text
+    reply = services.open_ai_connection.ask_ai(final_text)
+    #print(reply)
+    return JSONResponse(content={"reply": reply})
+
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
     print(authorization)
     return templates.TemplateResponse("test.html",{"request": request})
-# @app.get("/users/me")
-# async def read_user_me():
-#     return {"user_id": "the current user"}
-#
-#
-# @app.get("/users/{user_id}")
-# async def read_user(user_id: str):
-#     return {"user_id": user_id}
-#
-#
-#
+
+
 # @app.get("/items/")
 # async def read_item(skip: int = 0, limit: int = 10):
 #     return fake_items_db[skip : skip + limit]
