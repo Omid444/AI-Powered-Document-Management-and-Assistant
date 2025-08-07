@@ -117,13 +117,8 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
 
 @app.post("/api/file_upload")
 async def upload(file: UploadFile = File(...)):
-    text = extract_txt(file.file)
-    order = (" at first explains in two or fewer lines about this text. It is a document belongs to me"
-             "summarize this tex for me if document more than 10 line and. do not change text in summary"
-             "to much but make it more clear and easy to understand and remember always write it "
-             "in second person format")
-    final_text = order + "\n" + text
-    reply = services.open_ai_connection.ask_ai(final_text)
+    text, meta_data = extract_txt(file.file)
+    reply = services.open_ai_connection.ask_ai(text, meta_data)
     #print(reply)
     return JSONResponse(content={"reply": reply})
 
