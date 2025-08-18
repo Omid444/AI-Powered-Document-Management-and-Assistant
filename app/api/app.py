@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 import models.schemas
 import services.auth, services.open_ai_connection
-from models.models import User
+from models.models import User, Document
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
 from services.summarizer import extract_txt
@@ -51,21 +51,27 @@ async def get_signup_page(request: Request):
 
 @app.post("/signup")
 async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User.username).filter(models.models.User.email == user.username).scalar()
+    print("something here")
+    db_email = db.query(User.email).filter(User.email == user.email).scalar()
     if db_email:
-        raise HTTPException(status_code=400, detail="Username already used")
+        raise HTTPException(status_code=400, detail="Email already used")
     hashed_password = services.auth.hash_password(user.password)
-    new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
+    new_user = User(first_name=user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
+    print("new_user",new_user)
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(new_user)
     return {"message": "User created successfully", "email": user.email}
 
 
 @app.post("/login")
 async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
-    db_username = db.query(models.models.User.username).filter(models.models.User.username == user.username).scalar()
-    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.username == user.username).scalar()
+    db_username = db.query(User.username).filter(User.username == user.username).scalar()
+    db_hashed_password = db.query(User.hashed_password).filter(User.username == user.username).scalar()
     if not db_username or db_hashed_password is None:
         raise HTTPException(status_code=401, detail="Username or Password is incorrect")
     is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
@@ -113,14 +119,16 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("chatbot.html",{"request": request})
 
 
-
-
 @app.post("/api/file_upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
     text, meta_data = extract_txt(file.file)
     reply = services.open_ai_connection.ask_ai(text, meta_data)
     #print(reply)
-    return JSONResponse(content={"reply": reply})
+    new_document = Document(title=reply["title"], summary=reply["summary"], tags=reply["tags"], is_payment=reply["tags"]["is_payment"],is_tax_related=reply["tags"]["is_tax_related"],due_date=reply["tags"]["due_date"], doc_date=reply["tags"]["doc_date"])
+    db.add(new_document)
+    db.commit()
+
+    return JSONResponse(content={"reply": reply["summary"]})
 
 
 @app.get("/items")
