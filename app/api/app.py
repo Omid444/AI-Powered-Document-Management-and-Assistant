@@ -12,6 +12,7 @@ from models.models import User, Document
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
 from services.summarizer import extract_txt
+from datetime import date
 import uvicorn
 
 app = FastAPI()
@@ -106,11 +107,22 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
 @app.post("/api/chat")
 async def chat(request: Request, authorization: str = Header(None, alias="Authorization")):
     print("Authorization in api/chat:", authorization)
-    data = await request.json()
-    print(data)
-    user_message = data.get("message", "")
-    reply = services.open_ai_connection.ask_ai(user_message)
-    return JSONResponse(content={"reply": f"{reply}"})
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        data = await request.json()
+        print(data)
+        user_message = data.get("message", "")
+        reply = services.open_ai_connection.ask_ai(user_message)
+        return JSONResponse(content={"reply": f"{reply}"})
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
 
 
 @app.get("/chatbot")
@@ -119,16 +131,45 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
     return templates.TemplateResponse("chatbot.html",{"request": request})
 
 
-@app.post("/api/file_upload")
-async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    text, meta_data = extract_txt(file.file)
-    reply = services.open_ai_connection.ask_ai(text, meta_data)
-    #print(reply)
-    new_document = Document(title=reply["title"], summary=reply["summary"], tags=reply["tags"], is_payment=reply["tags"]["is_payment"],is_tax_related=reply["tags"]["is_tax_related"],due_date=reply["tags"]["due_date"], doc_date=reply["tags"]["doc_date"])
-    db.add(new_document)
-    db.commit()
 
-    return JSONResponse(content={"reply": reply["summary"]})
+@app.post("/api/file_upload")
+async def upload(file: UploadFile = File(...), authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
+    print("Authorization:", authorization)
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        text, meta_data = extract_txt(file.file)
+        reply = services.open_ai_connection.file_upload_llm(text, meta_data)
+        user_id= db.query(User.id).filter(User.username == username).scalar()
+        # print(type(reply["tags"]["due_date"]))
+        due_dat_str = reply.get("tags", {}).get("due_date")
+        try:
+            due_date = date.fromisoformat(due_dat_str) if due_dat_str else None
+        except ValueError:
+            due_date = None
+        doc_date_str = reply.get("tags", {}).get("due_date")
+        try:
+            doc_date = date.fromisoformat(doc_date_str) if doc_date_str else None
+        except ValueError:
+            doc_date = None
+        new_document = Document( user_id=user_id, title=reply["title"], summary=reply["summary"], tags=reply["tags"],
+                                is_payment=reply["tags"]["is_payment"], is_tax_related=reply["tags"]["is_tax_related"],
+                                due_date=due_date, doc_date=doc_date)
+        db.add(new_document)
+        db.commit()
+        return JSONResponse(content={"reply": reply["summary"]})
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
+
+
 
 
 @app.get("/items")
