@@ -11,9 +11,9 @@ import services.auth, services.open_ai_connection
 from models.models import User, Document
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-from services.summarizer import extract_txt
+from services.summarizer import extract_text_and_metadata
 from datetime import date
-import uvicorn
+from services import lang_chain
 
 app = FastAPI()
 
@@ -145,9 +145,10 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
 
-        text, meta_data = extract_txt(file.file)
+        text, meta_data = extract_text_and_metadata(file.file)
         reply = services.open_ai_connection.file_upload_llm(text, meta_data)
         user_id= db.query(User.id).filter(User.username == username).scalar()
+        lang_chain.turn_txt_to_vector(user_id, text)
         # print(type(reply["tags"]["due_date"]))
         due_dat_str = reply.get("tags", {}).get("due_date")
         try:

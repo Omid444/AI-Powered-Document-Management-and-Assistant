@@ -3,8 +3,13 @@ import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import TextLoader
+from langchain_community.vectorstores import Chroma
+from typing import List, TypedDict
+from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langgraph.graph import StateGraph, START
 
 load_dotenv()
 
@@ -13,15 +18,103 @@ if not os.environ.get("OPENAI_KEY"):
 
 llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+emb = OpenAIEmbeddings(model="text-embedding-3-large")
 
-vector_store = InMemoryVectorStore(embeddings)
+#vector_store = InMemoryVectorStore(embeddings)
+
+def get_user_store(user, emb=emb) -> Chroma:
+    """
+       Return a per-user Chroma vector store handle.
+
+       Creates (or opens, if it already exists) a Chroma collection that is isolated
+       by user_id. The 'persist_directory' ensures vectors are stored on disk so they
+       survive restarts. Passing the same embedding function guarantees that the
+       embeddings used for indexing and querying are consistent.
+
+       Args:
+           user_id: The application's unique identifier for the user.
+           emb:    The embedding function to use for both indexing and querying.
+
+       Returns:
+           A Chroma vector store instance scoped to the given user.
+       """
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    chroma_path = os.path.join(basedir, f"../db/data/{user}")
+    return Chroma(
+        collection_name=f"user_{user}",
+        persist_directory=chroma_path,
+        embedding_function=emb
+    )
 
 
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
-    add_start_index=True,  # مکان شروع هر چانک در متن اصلی
-)
-splits = text_splitter.split_documents(docs)
-print(f"num_splits={len(splits)}", splits[0].metadata)
+def turn_txt_to_vector(user, raw_document, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
+
+    vector_store = get_user_store(user, emb=emb)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, # chunk size (characters)
+        chunk_overlap=chunk_overlap, # chunk overlap (characters)
+        add_start_index=True,  # track index in original document
+    )
+    chunks = text_splitter.split_documents([Document(page_content=raw_document)])
+    vector_store.add_documents(chunks)
+
+    # 4) Persist to disk so the index survives restarts
+    vector_store.persist()
+
+    return len(chunks)
+
+
+# Define state for application
+class State(TypedDict):
+    question: str
+    context: List[Document]
+    answer: str
+
+
+# Define application steps
+def retrieve(user, state: State, k=4):
+    vector_store = get_user_store(user, emb=emb)
+    retrieved_docs = vector_store.similarity_search(state["question"], k=k)
+    return {"context": retrieved_docs}
+
+
+def generate(state: State):
+    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+    prompt = ChatPromptTemplate.from_messages([
+    ("system", "Use only the provided context. If insufficient, say: I don't know. "
+               "Output must be ONLY the final answer with no preface but with small explanation)."),
+    ("human",  "Question: {question}\n\nContext:\n{context}")
+])
+    messages = prompt.invoke({"question": state["question"], "context": docs_content})
+    response = llm.invoke(messages)
+    return {"answer": response.content}
+
+
+# Compile application and test
+# graph_builder = StateGraph(State).add_sequence([retrieve, generate])
+# graph_builder.add_edge(START, "retrieve")
+# graph = graph_builder.compile()
+
+if __name__ == "__main__":
+    user = "test_user"
+
+
+    raw_text = """
+    my name is kulo I live in tourta. I am 25 yearsoll.
+    I love island.
+    """
+
+    # ۱) تبدیل متن به بردار و ذخیره
+    chunks_count = turn_txt_to_vector(user, raw_text)
+    print(f"✅ {chunks_count} chunks added to vector store.")
+
+    # ۲) ساخت State اولیه
+    state: State = {
+        "question": "where do I live?",
+        "context": [],
+        "answer": ""
+    }
+
+    ret_doc = retrieve(user, state)
+    state.update(ret_doc)
+    print(generate(state))

@@ -1,7 +1,7 @@
 import PyPDF2
 
 
-def extract_txt(pdf_stream):
+def extract_text_and_metadata(pdf_stream):
     reader = PyPDF2.PdfReader(pdf_stream)
 
     full_text = ""
@@ -17,3 +17,4 @@ def extract_txt(pdf_stream):
         full_metadata[key] = value
 
     return full_text , full_metadata
+
