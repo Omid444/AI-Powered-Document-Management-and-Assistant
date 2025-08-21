@@ -20,6 +20,18 @@ llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
 emb = OpenAIEmbeddings(model="text-embedding-3-large")
 
+    # Define state for application
+class State(TypedDict):
+    question: str
+    context: List[Document]
+    answer: str
+
+state: State = {
+        "question": "",
+        "context": [],
+        "answer": ""
+    }
+
 #vector_store = InMemoryVectorStore(embeddings)
 
 def get_user_store(user, emb=emb) -> Chroma:
@@ -30,11 +42,6 @@ def get_user_store(user, emb=emb) -> Chroma:
        by user_id. The 'persist_directory' ensures vectors are stored on disk so they
        survive restarts. Passing the same embedding function guarantees that the
        embeddings used for indexing and querying are consistent.
-
-       Args:
-           user_id: The application's unique identifier for the user.
-           emb:    The embedding function to use for both indexing and querying.
-
        Returns:
            A Chroma vector store instance scoped to the given user.
        """
@@ -64,25 +71,21 @@ def turn_txt_to_vector(user, raw_document, chunk_size: int = 1000, chunk_overlap
     return len(chunks)
 
 
-# Define state for application
-class State(TypedDict):
-    question: str
-    context: List[Document]
-    answer: str
 
 
 # Define application steps
-def retrieve(user, state: State, k=4):
+def retrieve(user, state: State = state, k=4):
     vector_store = get_user_store(user, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k)
     return {"context": retrieved_docs}
 
 
-def generate(state: State):
+def generate(state: State=state):
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
     prompt = ChatPromptTemplate.from_messages([
-    ("system", "Use only the provided context. If insufficient, say: I don't know. "
-               "Output must be ONLY the final answer with no preface but with small explanation)."),
+    ("system", "Use only the provided context. "
+               "If insufficient, ask related question to gather more information that you need "
+               "Output must be ONLY the answer in a few sentences)."),
     ("human",  "Question: {question}\n\nContext:\n{context}")
 ])
     messages = prompt.invoke({"question": state["question"], "context": docs_content})
@@ -95,26 +98,26 @@ def generate(state: State):
 # graph_builder.add_edge(START, "retrieve")
 # graph = graph_builder.compile()
 
-if __name__ == "__main__":
-    user = "test_user"
-
-
-    raw_text = """
-    my name is kulo I live in tourta. I am 25 yearsoll.
-    I love island.
-    """
-
-    # ۱) تبدیل متن به بردار و ذخیره
-    chunks_count = turn_txt_to_vector(user, raw_text)
-    print(f"✅ {chunks_count} chunks added to vector store.")
-
-    # ۲) ساخت State اولیه
-    state: State = {
-        "question": "where do I live?",
-        "context": [],
-        "answer": ""
-    }
-
-    ret_doc = retrieve(user, state)
-    state.update(ret_doc)
-    print(generate(state))
+# if __name__ == "__main__":
+#     user = "test_user"
+#
+#
+#     raw_text = """
+#     my name is kulo I live in tourta. I am 25 yearsoll.
+#     I love island.
+#     """
+#
+#     # ۱) تبدیل متن به بردار و ذخیره
+#     chunks_count = turn_txt_to_vector(user, raw_text)
+#     print(f"✅ {chunks_count} chunks added to vector store.")
+#
+#     # ۲) ساخت State اولیه
+#     state: State = {
+#         "question": "where do I live?",
+#         "context": [],
+#         "answer": ""
+#     }
+#
+#     ret_doc = retrieve(user, state)
+#     state.update(ret_doc)
+#     print(generate(state))

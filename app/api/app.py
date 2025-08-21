@@ -11,6 +11,7 @@ import services.auth, services.open_ai_connection
 from models.models import User, Document
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
+from services.lang_chain import retrieve
 from services.summarizer import extract_text_and_metadata
 from datetime import date
 from services import lang_chain
@@ -105,7 +106,7 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
 
 
 @app.post("/api/chat")
-async def chat(request: Request, authorization: str = Header(None, alias="Authorization")):
+async def chat(request: Request, authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
     print("Authorization in api/chat:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -114,13 +115,21 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
 
     try:
         username = services.auth.verify_token(token)
+        user_id = db.query(User.id).filter(User.username == username).scalar()
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         data = await request.json()
         print(data)
         user_message = data.get("message", "")
-        reply = services.open_ai_connection.ask_ai(user_message)
-        return JSONResponse(content={"reply": f"{reply}"})
+        #reply = services.open_ai_connection.ask_ai(user_message)
+        lang_chain.state.update({"question": user_message})
+        print(lang_chain.state)
+        retrieved_doc = lang_chain.retrieve(user_id)
+        print(retrieved_doc)
+        lang_chain.state.update(retrieved_doc)
+        reply = lang_chain.generate()
+        print(reply)
+        return JSONResponse(content={"reply": f"{reply["answer"]}"})
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
