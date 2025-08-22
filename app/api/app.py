@@ -8,11 +8,13 @@ from pathlib import Path
 from fastapi import FastAPI
 import models.schemas
 import services.auth, services.open_ai_connection
-from models.models import User
+from models.models import User, Document
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-from services.summarizer import extract_txt
-import uvicorn
+from services.lang_chain import retrieve
+from services.summarizer import extract_text_and_metadata
+from datetime import date
+from services import lang_chain
 
 app = FastAPI()
 
@@ -51,21 +53,27 @@ async def get_signup_page(request: Request):
 
 @app.post("/signup")
 async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
-    db_email = db.query(models.models.User.username).filter(models.models.User.email == user.username).scalar()
+    print("something here")
+    db_email = db.query(User.email).filter(User.email == user.email).scalar()
     if db_email:
-        raise HTTPException(status_code=400, detail="Username already used")
+        raise HTTPException(status_code=400, detail="Email already used")
     hashed_password = services.auth.hash_password(user.password)
-    new_user = models.models.User(first_name= user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
+    new_user = User(first_name=user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
+    print("new_user",new_user)
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(new_user)
     return {"message": "User created successfully", "email": user.email}
 
 
 @app.post("/login")
 async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
-    db_username = db.query(models.models.User.username).filter(models.models.User.username == user.username).scalar()
-    db_hashed_password = db.query(models.models.User.hashed_password).filter(models.models.User.username == user.username).scalar()
+    db_username = db.query(User.username).filter(User.username == user.username).scalar()
+    db_hashed_password = db.query(User.hashed_password).filter(User.username == user.username).scalar()
     if not db_username or db_hashed_password is None:
         raise HTTPException(status_code=401, detail="Username or Password is incorrect")
     is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
@@ -98,13 +106,32 @@ async def account(request: Request, authorization: str = Header(None, alias="Aut
 
 
 @app.post("/api/chat")
-async def chat(request: Request, authorization: str = Header(None, alias="Authorization")):
+async def chat(request: Request, authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
     print("Authorization in api/chat:", authorization)
-    data = await request.json()
-    print(data)
-    user_message = data.get("message", "")
-    reply = services.open_ai_connection.ask_ai(user_message)
-    return JSONResponse(content={"reply": f"{reply}"})
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        user_id = db.query(User.id).filter(User.username == username).scalar()
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        data = await request.json()
+        print(data)
+        user_message = data.get("message", "")
+        #reply = services.open_ai_connection.ask_ai(user_message)
+        lang_chain.state.update({"question": user_message})
+        print(lang_chain.state)
+        retrieved_doc = lang_chain.retrieve(user_id)
+        print(retrieved_doc)
+        lang_chain.state.update(retrieved_doc)
+        reply = lang_chain.generate()
+        print(reply)
+        return JSONResponse(content={"reply": f"{reply["answer"]}"})
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
 
 
 @app.get("/chatbot")
@@ -114,13 +141,45 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
 
 
 
-
 @app.post("/api/file_upload")
-async def upload(file: UploadFile = File(...)):
-    text, meta_data = extract_txt(file.file)
-    reply = services.open_ai_connection.ask_ai(text, meta_data)
-    #print(reply)
-    return JSONResponse(content={"reply": reply})
+async def upload(file: UploadFile = File(...), authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
+    print("Authorization:", authorization)
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        text, meta_data = extract_text_and_metadata(file.file)
+        reply = services.open_ai_connection.file_upload_llm(text, meta_data)
+        user_id= db.query(User.id).filter(User.username == username).scalar()
+        lang_chain.turn_txt_to_vector(user_id, text)
+        # print(type(reply["tags"]["due_date"]))
+        due_dat_str = reply.get("tags", {}).get("due_date")
+        try:
+            due_date = date.fromisoformat(due_dat_str) if due_dat_str else None
+        except ValueError:
+            due_date = None
+        doc_date_str = reply.get("tags", {}).get("due_date")
+        try:
+            doc_date = date.fromisoformat(doc_date_str) if doc_date_str else None
+        except ValueError:
+            doc_date = None
+        new_document = Document( user_id=user_id, title=reply["title"], summary=reply["summary"], tags=reply["tags"],
+                                is_payment=reply["tags"]["is_payment"], is_tax_related=reply["tags"]["is_tax_related"],
+                                due_date=due_date, doc_date=doc_date)
+        db.add(new_document)
+        db.commit()
+        return JSONResponse(content={"reply": reply["summary"]})
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
+
+
 
 
 @app.get("/items")
