@@ -74,7 +74,7 @@ def turn_txt_to_vector(user, raw_document, chunk_size: int = 1000, chunk_overlap
 
 
 # Define application steps
-def retrieve(user, state: State = state, k=4):
+def retrieve(user, state: State = state, k=1):
     vector_store = get_user_store(user, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k)
     return {"context": retrieved_docs}
