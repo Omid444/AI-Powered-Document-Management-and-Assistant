@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', path='css/account.css') }}">
+{% endblock %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<!-- یک کانتینر برای تزریق محتوای صفحه -->
+  <!--<main id="main-content">
+    <p>page is loading</p>
+  </main>-->
+<h1>account Form</h1>
+<p>Welcome, {{ firstname }}</p>
+<ul id="ul-right">
+  <li><a href="/account" id="home-link" class="active" onclick="mylog(event)">Home</a></li>
+  <li><a href="/dashboard" id="dashboard-link" onclick="goDashboard(event)">Dashboard2</a></li>
+  <li><a href="#contact">Contact</a></li>
+  <li style="float:right"><a href="#about">About</a></li>
+</ul>
+
+{% for doc in documnets %}
+  <table>
+    <tr>
+        <td>{{ doc }}</td>
+        <td>{{ doc }}</td>
+        <td>{{ doc }}</td>
+    </tr>
+  </table>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
+{% endblock %}

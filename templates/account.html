@@ -14,8 +14,8 @@
 <h1>account Form</h1>
 <p>Welcome, {{ firstname }}</p>
 <ul id="ul-right">
-  <li><a class="active" href="#home">Home</a></li>
-  <li><a href="#news">Dashboard</a></li>
+  <li><a href="/account" id="home-link" class="active" onclick="mylog(event)">Home</a></li>
+  <li><a href="/dashboard" id="dashboard-link" onclick="goDashboard(event)">Dashboard</a></li>
   <li><a href="#contact">Contact</a></li>
   <li style="float:right"><a href="#about">About</a></li>
 </ul>
@@ -32,5 +32,5 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="{{ url_for('static', path='js/account.js') }}"></script>
+  <script type="module" src="{{ url_for('static', path='js/account.js') }}"></script>
 {% endblock %}

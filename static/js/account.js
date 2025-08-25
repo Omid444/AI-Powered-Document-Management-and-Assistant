@@ -1,75 +1,122 @@
+
 console.log("✅ account.js loaded!");
 
-export async function loadAccountPage() {
-  const token = localStorage.getItem("access_token");
+let navLock = false;
+let currentNavAbort = null;
+
+function getToken() {
+  return localStorage.getItem("access_token");
+}
+
+function lockNav() {
+  navLock = true;
+  // اختیاری: غیرفعال کردن لینک‌ها تا پایان ناوبری
+  document.body.style.pointerEvents = "none";
+}
+
+function unlockNav() {
+  navLock = false;
+  document.body.style.pointerEvents = "";
+}
+
+async function fetchWithAuth(url, signal) {
+  const token = getToken();
   if (!token) {
     alert("No token found. Please login.");
-    window.location.href = "/";
-    return;
+    location.href = "/";
+    throw new Error("No token");
   }
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+    signal
+  });
+  if (res.status === 401 || res.status === 403) {
+    alert("Session expired. Please login again.");
+    localStorage.removeItem("access_token");
+    location.href = "/";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
 
+function replaceDocument(html) {
+  document.open();
+  document.write(html);
+  document.close();
+}
+
+// ——— ناوبری امن به /dashboard
+async function goToDashboard() {
+  if (navLock) return;             // جلوگیری از کلیک‌های پشت‌سرهم
+  if (currentNavAbort) currentNavAbort.abort(); // لغو ناوبری قبلی
+  currentNavAbort = new AbortController();
+  lockNav();
   try {
-    const response = await fetch("/account", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) throw new Error("Unauthorized");
-
-    const html = await response.text();
-    document.open();
-    document.write(html);
-    document.close();
-
-    // دریافت ارجاع به iframe و دکمه جدید
-    const iframe = document.querySelector(".chatbot-frame");
-    const openChatbotButton = document.getElementById("open-chatbot-button");
-
-    // 👇 تغییرات برای ارسال مطمئن‌تر توکن
-    if (iframe && iframe.contentWindow && token) {
-        console.log("✅ Attempting to send token with a small delay.");
-        // یک تأخیر کوتاه اضافه می‌کنیم تا iframe کاملاً آماده دریافت پیام شود.
-        setTimeout(() => {
-            iframe.contentWindow.postMessage({ token: token }, "*");
-            console.log("✅ Token sent to iframe via postMessage with a small delay");
-        }, 200); // 100ms تأخیر
-    }
-
-    // همچنان شنونده load را به عنوان یک راه حل پشتیبان نگه می‌داریم.
-    iframe.addEventListener("load", () => {
-        if (token && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ token: token }, "*");
-            console.log("✅ Token sent to iframe via postMessage on load event");
-        }
-    });
-
-    // 👇 بخش اول: شنونده برای پیام‌های ارسالی از داخل iframe
-    window.addEventListener("message", (event) => {
-      if (event.data && event.data.toggle) {
-        console.log("✔️ Message received from chatbot! Toggling iframe class.");
-        if (iframe) {
-            iframe.classList.toggle("close");
-            openChatbotButton.classList.toggle("close");
-        } else {
-            console.error("❌ Chatbot iframe not found in the DOM.");
-        }
-      }
-    });
-
-    // 👇 بخش دوم: شنونده برای کلیک روی دکمه باز کردن چت‌بات
-    if (openChatbotButton) {
-        openChatbotButton.addEventListener("click", () => {
-            console.log("✔️ Open button clicked! Maximizing chatbot.");
-            iframe.classList.remove("close");
-            openChatbotButton.classList.remove("close");
-        });
-    }
-
-  } catch (error) {
-    console.error("Access denied:", error);
-    alert("Access denied. Please login again.");
-    window.location.href = "/";
+    const html = await fetchWithAuth("/dashboard", currentNavAbort.signal);
+    replaceDocument(html);
+    try { if (location.pathname !== "/dashboard") history.pushState({}, "", "/dashboard"); } catch {}
+  } finally {
+    unlockNav();
   }
 }
+
+// ——— ناوبری امن به /account (اگر در همین فایل نیاز دارید)
+export async function loadAccountPage() {
+  if (navLock) return;
+  if (currentNavAbort) currentNavAbort.abort();
+  currentNavAbort = new AbortController();
+  lockNav();
+  try {
+    const html = await fetchWithAuth("/account", currentNavAbort.signal);
+    replaceDocument(html);
+    try { if (location.pathname !== "/account") history.pushState({}, "", "/account"); } catch {}
+
+    // اگر iframe چت‌بات دارید و باید توکن بفرستید:
+    const token = getToken();
+    const iframe = document.querySelector(".chatbot-frame");
+    if (iframe && token) {
+      const send = () => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.postMessage({ token }, window.location.origin);
+          console.log("✅ Token sent to chatbot iframe");
+        }
+      };
+      setTimeout(send, 200);
+      iframe.addEventListener("load", send, { once: true });
+    }
+  } finally {
+    unlockNav();
+  }
+}
+
+// ——— برای inline HTML
+window.goDashboard = function (evt) {
+  evt?.preventDefault?.();
+  evt?.stopPropagation?.();
+  goToDashboard().catch(e => console.error(e));
+};
+
+window.mylog = function (evt) {
+  evt?.preventDefault?.();
+  evt?.stopPropagation?.();
+  loadAccountPage().catch(e => console.error(e));
+};
+
+// ——— Delegation با capture: حتی اگر inline جا بمونه، کلیک را می‌گیریم
+document.addEventListener("click", (e) => {
+  const aDash = e.target.closest('a[href="/dashboard"], #dashboard-link');
+  if (aDash) {
+    e.preventDefault();
+    e.stopPropagation();
+    window.goDashboard();
+    return;
+  }
+  const aHome = e.target.closest('a[href="/account"], #home-link');
+  if (aHome) {
+    e.preventDefault();
+    e.stopPropagation();
+    window.mylog();
+  }
+}, true); // capture=true که از ناوبری عادی جلوتر باشه

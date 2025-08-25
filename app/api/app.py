@@ -87,7 +87,7 @@ async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
 @app.get("/account")
 async def account(request: Request, authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
     #user_firstname = db.query(models.models.User).filter(models.models.User.username == user.username)
-    print("Authorization:", authorization)
+    print("Authorization in account:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
@@ -143,7 +143,7 @@ async def chatbot(request: Request, authorization: str = Header(None, alias="Aut
 
 @app.post("/api/file_upload")
 async def upload(file: UploadFile = File(...), authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
-    print("Authorization:", authorization)
+    print("Authorization file_upload:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
@@ -179,6 +179,23 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
+
+@app.get("/dashboard")
+async def show_dashboard(request: Request, authorization: str = Header(None, alias="Authorization")):
+    print("Authorization in dashboard:", authorization)
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return templates.TemplateResponse("dashboard.html",{"request": request})
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
 
 
 

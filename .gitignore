@@ -1,8 +1,26 @@
 .env
-venv/
-__pycache__/
 *.sqlite
 app/db/data/
 db/data/
 /venv
 
+# virtual envs
+venv/
+.venv/
+env/
+ENV/
+
+# python junk
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# build & metadata
+*.egg-info/
+dist/
+build/
+
+# editors
+.vscode/
+.idea/
