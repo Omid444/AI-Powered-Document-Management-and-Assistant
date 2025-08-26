@@ -1,15 +1,15 @@
 import getpass
 import os
+import uuid
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
 from langchain_community.vectorstores import Chroma
 from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-from langgraph.graph import StateGraph, START
+from sqlalchemy.testing.suite.test_reflection import metadata
 
 load_dotenv()
 
@@ -34,6 +34,15 @@ state: State = {
     }
 
 
+def create_source_key(username:str, file_name:str) ->str:
+    """Creates a unique and safe source key for a file based on user_id and file name."""
+    unique_file_id = str(uuid.uuid4())
+    #To prevent special character that might cause problem for ChromaDB
+    safe_file_name = file_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    source_key = f"user_{username}/{unique_file_id}_{safe_file_name}"
+    return source_key
+
+
 def get_user_store(user, emb=emb) -> Chroma:
     """
        Return a per-user Chroma vector store handle.
@@ -54,29 +63,31 @@ def get_user_store(user, emb=emb) -> Chroma:
     )
 
 
-def turn_txt_to_vector(user, raw_document, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
+def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
 
-    vector_store = get_user_store(user, emb=emb)
+    vector_store = get_user_store(username, emb=emb)
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, # chunk size (characters)
         chunk_overlap=chunk_overlap, # chunk overlap (characters)
         add_start_index=True,  # track index in original document
     )
     chunks = text_splitter.split_documents([Document(page_content=raw_document)])
-    vector_store.add_documents(chunks)
+    for chunk in chunks:
+        chunk.metadata["username"] = username
+        chunk.metadata["source_key"] = create_source_key(username,file_name)
+        chunk.metadata["file_name"] = file_name
 
-    # 4) Persist to disk so the index survives restarts
+    vector_store.add_documents(chunks)
+    #Persist to disk so the index survives restarts
     vector_store.persist()
 
     return len(chunks)
 
 
-
-
 # Define application steps
-def retrieve(user, state: State = state, k=1):
-    vector_store = get_user_store(user, emb=emb)
-    retrieved_docs = vector_store.similarity_search(state["question"], k=k)
+def retrieve(username, state: State = state, k=1):
+    vector_store = get_user_store(username, emb=emb)
+    retrieved_docs = vector_store.similarity_search(state["question"], k=k, filter={"username": username})
     return {"context": retrieved_docs}
 
 
