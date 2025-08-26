@@ -20,7 +20,8 @@ llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
 emb = OpenAIEmbeddings(model="text-embedding-3-large")
 
-    # Define state for application
+
+# Define state for application
 class State(TypedDict):
     question: str
     context: List[Document]
@@ -32,7 +33,6 @@ state: State = {
         "answer": ""
     }
 
-#vector_store = InMemoryVectorStore(embeddings)
 
 def get_user_store(user, emb=emb) -> Chroma:
     """

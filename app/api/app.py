@@ -55,8 +55,11 @@ async def get_signup_page(request: Request):
 async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db)):
     print("something here")
     db_email = db.query(User.email).filter(User.email == user.email).scalar()
+    db_username = db.query(User.username).filter(User.username == user.username).scalar()
     if db_email:
         raise HTTPException(status_code=400, detail="Email already used")
+    if db_username:
+        raise HTTPException(status_code=400, detail="Username already used")
     hashed_password = services.auth.hash_password(user.password)
     new_user = User(first_name=user.first_name, last_name=user.last_name, email=user.email, username=user.username, hashed_password=hashed_password)
     print("new_user",new_user)
@@ -192,6 +195,7 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
         username = services.auth.verify_token(token)
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+        all_doc = lang_chain.generate()
         return templates.TemplateResponse("dashboard.html",{"request": request})
 
     except JWTError:
