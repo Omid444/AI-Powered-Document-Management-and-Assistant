@@ -184,7 +184,8 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
 
 
 @app.get("/dashboard")
-async def show_dashboard(request: Request, authorization: str = Header(None, alias="Authorization")):
+async def show_dashboard(request: Request, authorization: str = Header(None, alias="Authorization"),
+                         db: Session = Depends(get_db)):
     print("Authorization in dashboard:", authorization)
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -196,8 +197,12 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         v_db = lang_chain.get_user_store(username)
-        all_doc = v_db.get(where={"user_id": "user1"})
-        return templates.TemplateResponse("dashboard.html",{"request": request, "documents":"ABCD"})
+        all_docs = v_db.get(where={"username": username})
+
+        print("*****this is doc*****:    ", all_docs)
+        user_firstname = db.query(models.models.User.first_name).filter(
+            models.models.User.username == username).scalar()
+        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents":all_docs["documents"]})
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")

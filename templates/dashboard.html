@@ -1,7 +1,18 @@
 {% extends "base.html" %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='css/account.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/dashboard.css') }}">
+  <style>
+    /* اضافه کردن استایل برای حاشیه جدول و سلول‌ها */
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 8px; /* اضافه کردن فضای داخلی برای خوانایی بهتر */
+    }
+    table {
+      width: 100%; /* جدول تمام عرض صفحه را می‌گیرد */
+    }
+  </style>
 {% endblock %}
 
 {% block title %}Home{% endblock %}
@@ -14,17 +25,15 @@
 <h1>account Form</h1>
 <p>Welcome, {{ firstname }}</p>
 <ul id="ul-right">
-  <li><a href="/account" id="home-link" class="active" onclick="mylog(event)">Home</a></li>
-  <li><a href="/dashboard" id="dashboard-link" onclick="goDashboard(event)">Dashboard2</a></li>
+  <li><a href="/account" id="home-link"  onclick="mylog(event)">Home</a></li>
+  <li><a href="/dashboard" class="active" id="dashboard-link" onclick="goDashboard(event)">Dashboard</a></li>
   <li><a href="#contact">Contact</a></li>
   <li style="float:right"><a href="#about">About</a></li>
 </ul>
 
-{% for doc in documnets %}
+{% for doc in documents %}
   <table>
     <tr>
-        <td>{{ doc }}</td>
-        <td>{{ doc }}</td>
         <td>{{ doc }}</td>
     </tr>
   </table>
