@@ -28,7 +28,7 @@ li a:hover:not(.active) {
 }
 
 .active {
-  background-color: #04AA6D;
+  background-color: #0399a1;
 }
     /* اضافه کردن استایل برای حاشیه جدول و سلول‌ها */
 table, th, td {
@@ -38,4 +38,20 @@ table, th, td {
 }
 table {
   width: 100%; /* جدول تمام عرض صفحه را می‌گیرد */
+}
+
+.btn {
+  background-color: white;
+  color: green;
+  border: 2px solid #0399a1;
+  padding: 4px 6px;
+  margin: 2px 0;
+  cursor: pointer;
+  border-radius:5px 5px;
+  width: 10%;
+}
+
+.btn:hover {
+  background-color: #0399a1;
+  color: white
 }

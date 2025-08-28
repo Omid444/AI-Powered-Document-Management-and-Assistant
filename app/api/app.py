@@ -197,12 +197,12 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         v_db = lang_chain.get_user_store(username)
-        all_docs = v_db.get(where={"username": username})
+        all_documents = v_db.get(where={"username": username})
 
-        print("*****this is doc*****:    ", all_docs)
+        print("*****this is all documents*****:    ", all_documents)
         user_firstname = db.query(models.models.User.first_name).filter(
             models.models.User.username == username).scalar()
-        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents":all_docs["documents"]})
+        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents":all_documents})
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")

@@ -31,11 +31,17 @@
   <li style="float:right"><a href="#about">About</a></li>
 </ul>
 
-{% for doc in documents %}
+{% for meta in documents["metadatas"] %}
   <table>
+
     <tr>
-        <td>{{ doc }}</td>
+        <td>{{loop.index}}. {{ meta["file_name"] }}
+          <!--{{documents["documents"][loop.index0][:520]}}-->
+          <button class="btn" onclick="">Show Document</button>
+        </td>
+
     </tr>
+    <br>
   </table>
 {% endfor %}
 
