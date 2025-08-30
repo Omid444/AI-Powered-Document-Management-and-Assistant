@@ -43,7 +43,7 @@ def create_source_key(username:str, file_name:str) ->str:
     return source_key
 
 
-def get_user_store(user, emb=emb) -> Chroma:
+def get_user_store(user, emb=emb, distance_function="cosine") -> Chroma:
     """
        Return a per-user Chroma vector store handle.
 
@@ -59,8 +59,55 @@ def get_user_store(user, emb=emb) -> Chroma:
     return Chroma(
         collection_name=f"user_{user}",
         persist_directory=chroma_path,
+        collection_metadata={"hnsw:space": distance_function},
         embedding_function=emb
     )
+
+
+def check_for_duplicate_document(username, raw_document: str, emb=emb, similarity_point: float = 0.98) -> bool:
+    """
+    Checks if a document with similar content already exists in the ChromaDB.
+    It compares the new document with existing ones by using a representative sample
+    of chunks from the new document.
+    Returns:bool: True if a duplicate is found, False otherwise
+    """
+    vector_store = get_user_store(username, emb=emb, distance_function="cosine")
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,  # chunk size (characters)
+        chunk_overlap=200,  # chunk overlap (characters)
+        add_start_index=True,  # track index in original document
+    )
+    new_chunks = text_splitter.split_documents([Document(page_content=raw_document)])
+    if not new_chunks:
+        print("Error: Document is empty or could not be processed.")
+        return True  # Treat as duplicate to avoid errors
+    chunks_to_compare = []
+    num_chunks = len(new_chunks)
+    if num_chunks <= 3:
+        chunks_to_compare = new_chunks
+    else:
+        chunks_to_compare.append(new_chunks[0])
+        chunks_to_compare.append(new_chunks[num_chunks // 2])
+        chunks_to_compare.append(new_chunks[num_chunks - 1])
+
+    comparison_text = " ".join([chunk.page_content for chunk in chunks_to_compare])
+    retrieved_docs = vector_store.similarity_search_with_score(comparison_text, k=1, filter={"username": username})
+    #print("**********retrieved_docs", retrieved_docs[0])
+    if retrieved_docs:
+        most_similar_document, distance = retrieved_docs[0]
+        print("distance",distance)
+        print("similarity_point",similarity_point)
+        similarity = 1.0 - distance
+
+        if similarity >= similarity_point:
+            print(f"Document already exists with a similarity score of {similarity}.")
+            return True
+        else:
+            print(f"No similar document found. The highest score was {similarity}.")
+            return False
+
+    print("No documents found for this user. This is a new document.")
+    return False
 
 
 def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
@@ -72,6 +119,9 @@ def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000
         add_start_index=True,  # track index in original document
     )
     chunks = text_splitter.split_documents([Document(page_content=raw_document)])
+    if not chunks:
+        print("Error: Document is empty or could not be processed.")
+        return
     for chunk in chunks:
         chunk.metadata["username"] = username
         chunk.metadata["source_key"] = create_source_key(username,file_name)
@@ -85,7 +135,7 @@ def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000
 
 
 # Define application steps
-def retrieve(username, state: State = state, k=1):
+def retrieve_document(username, state: State = state, k=1):
     vector_store = get_user_store(username, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k, filter={"username": username})
     return {"context": retrieved_docs}

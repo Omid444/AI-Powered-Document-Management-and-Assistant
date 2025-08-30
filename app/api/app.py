@@ -11,7 +11,7 @@ import services.auth, services.open_ai_connection
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-from services.lang_chain import retrieve
+from services.lang_chain import retrieve_document
 from services.summarizer import extract_text_and_metadata
 from datetime import date
 from services import lang_chain
@@ -127,7 +127,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
         #reply = services.open_ai_connection.ask_ai(user_message)
         lang_chain.state.update({"question": user_message})
         print(lang_chain.state)
-        retrieved_doc = lang_chain.retrieve(username)
+        retrieved_doc = lang_chain.retrieve_document(username)
         print(retrieved_doc)
         lang_chain.state.update(retrieved_doc)
         reply = lang_chain.generate()
@@ -157,26 +157,16 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         file_name = file.filename
-        text, meta_data = extract_text_and_metadata(file.file)
-        reply = services.open_ai_connection.file_upload_llm(text, meta_data)
+        file_content, meta_data = extract_text_and_metadata(file.file)
+        is_file_duplicate = lang_chain.check_for_duplicate_document(username, file_content)
+        if is_file_duplicate:
+            return JSONResponse(content={"reply": "Your file is already exist in database,\n"
+                                                  "Do you have any question about it,\n"
+                                                  "Please let me know"})
+        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
         #user_id= db.query(User.id).filter(User.username == username).scalar()
-        lang_chain.turn_txt_to_vector(username, text, file_name)
-        # print(type(reply["tags"]["due_date"]))
-        # due_dat_str = reply.get("tags", {}).get("due_date")
-        # try:
-        #     due_date = date.fromisoformat(due_dat_str) if due_dat_str else None
-        # except ValueError:
-        #     due_date = None
-        # doc_date_str = reply.get("tags", {}).get("due_date")
-        # try:
-        #     doc_date = date.fromisoformat(doc_date_str) if doc_date_str else None
-        # except ValueError:
-        #     doc_date = None
-        # new_document = Document( user_id=user_id, title=reply["title"], summary=reply["summary"], tags=reply["tags"],
-        #                         is_payment=reply["tags"]["is_payment"], is_tax_related=reply["tags"]["is_tax_related"],
-        #                         due_date=due_date, doc_date=doc_date)
-        # db.add(new_document)
-        # db.commit()
+        lang_chain.turn_txt_to_vector(username, file_content, file_name)
+
         return JSONResponse(content={"reply": reply["summary"]})
 
     except JWTError:
