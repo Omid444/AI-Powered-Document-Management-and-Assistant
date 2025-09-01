@@ -24,3 +24,7 @@ build/
 # editors
 .vscode/
 .idea/
+
+
+#storage
+uploads/

@@ -1,4 +1,6 @@
-from http.client import HTTPException
+import models.schemas
+import services.auth, services.open_ai_connection
+import shutil
 from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from jose import JWTError
@@ -6,14 +8,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from fastapi import FastAPI
-import models.schemas
-import services.auth, services.open_ai_connection
 from models.models import User
 from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
-from services.lang_chain import retrieve_document
 from services.summarizer import extract_text_and_metadata
-from datetime import date
 from services import lang_chain
 
 app = FastAPI()
@@ -38,6 +36,29 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def create_file_path(user_name, file_name):
+    user_dir = BASE_DIR / "uploads" /user_name
+    user_dir.mkdir(parents=True, exist_ok=True)
+    ext = Path(file_name).suffix
+    file_path = user_dir / f"{lang_chain.create_source_key(username=user_name, file_name=file_name)}"
+    return file_path
+
+
+
+def save_file(file, username, file_name):
+    file_path = create_file_path(username, file_name)
+    try:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file, buffer)# type: ignore
+            return "File Saved"
+    except PermissionError:
+        reply = "Permission denied."
+        return reply
+    except Exception as e :
+        reply = f"Error occurred while copying file. details:{e}"
+        return reply
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -164,8 +185,14 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
                                                   "Do you have any question about it,\n"
                                                   "Please let me know"})
         reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+        file_path = create_file_path(username, file_name)
+        file.file.seek(0)
+        is_filed_saved  = save_file(file.file,username, file_name)
+        if is_filed_saved != "File Saved":
+            return JSONResponse(content={"reply": is_filed_saved})
+
         #user_id= db.query(User.id).filter(User.username == username).scalar()
-        lang_chain.turn_txt_to_vector(username, file_content, file_name)
+        lang_chain.turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path)
 
         return JSONResponse(content={"reply": reply["summary"]})
 

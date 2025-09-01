@@ -1,6 +1,5 @@
 import getpass
-import os
-import uuid
+import os, re ,uuid
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
@@ -9,7 +8,7 @@ from langchain_community.vectorstores import Chroma
 from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-from sqlalchemy.testing.suite.test_reflection import metadata
+
 
 load_dotenv()
 
@@ -34,12 +33,20 @@ state: State = {
     }
 
 
+def make_clean_file_name(name)-> str:
+    """Clean filename from special characters, turn it to hash format and return it"""
+    file_name = name.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    file_name = file_name.strip().lower()
+    file_name = re.sub(r"[^A-Za-z0-9._-]", "_", file_name)
+    return file_name
+
+
 def create_source_key(username:str, file_name:str) ->str:
     """Creates a unique and safe source key for a file based on user_id and file name."""
     unique_file_id = str(uuid.uuid4())
     #To prevent special character that might cause problem for ChromaDB
-    safe_file_name = file_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
-    source_key = f"user_{username}/{unique_file_id}_{safe_file_name}"
+    safe_file_name = make_clean_file_name(file_name)
+    source_key = f"user_{username}_{unique_file_id}_{safe_file_name}"
     return source_key
 
 
@@ -110,7 +117,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
     return False
 
 
-def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
+def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
 
     vector_store = get_user_store(username, emb=emb)
     text_splitter = RecursiveCharacterTextSplitter(
@@ -121,11 +128,12 @@ def turn_txt_to_vector(username, raw_document, file_name, chunk_size: int = 1000
     chunks = text_splitter.split_documents([Document(page_content=raw_document)])
     if not chunks:
         print("Error: Document is empty or could not be processed.")
-        return
+        return 0
     for chunk in chunks:
         chunk.metadata["username"] = username
         chunk.metadata["source_key"] = create_source_key(username,file_name)
         chunk.metadata["file_name"] = file_name
+        chunk.metadata["file_path"] = str(file_path)
 
     vector_store.add_documents(chunks)
     #Persist to disk so the index survives restarts
