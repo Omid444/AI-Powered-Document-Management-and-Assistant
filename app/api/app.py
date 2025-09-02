@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from db.database import SessionLocal, session
 from services.summarizer import extract_text_and_metadata
 from services import lang_chain
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
@@ -47,8 +48,8 @@ def create_file_path(user_name, file_name):
 
 
 
-def save_file(file, username, file_name):
-    file_path = create_file_path(username, file_name)
+def save_file(file, file_path):
+
     try:
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file, buffer)# type: ignore
@@ -59,6 +60,27 @@ def save_file(file, username, file_name):
     except Exception as e :
         reply = f"Error occurred while copying file. details:{e}"
         return reply
+
+
+
+def check_authorization(authorization):
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        username = services.auth.verify_token(token)
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return username
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token verification failed")
+
+
+
+
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -187,7 +209,7 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
         reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
         file_path = create_file_path(username, file_name)
         file.file.seek(0)
-        is_filed_saved  = save_file(file.file,username, file_name)
+        is_filed_saved  = save_file(file.file,file_path)
         if is_filed_saved != "File Saved":
             return JSONResponse(content={"reply": is_filed_saved})
 
@@ -215,16 +237,51 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
             raise HTTPException(status_code=401, detail="Invalid token payload")
         v_db = lang_chain.get_user_store(username)
         all_documents = v_db.get(where={"username": username})
+        metadata_list = [
+            {
+                "file_name": doc.get("file_name"),
+                "document_id": doc.get("document_id")
+            }
+            for doc in all_documents["metadatas"]
+        ]
 
-        print("*****this is all documents*****:    ", all_documents)
+        #print("*****this is all documents*****:    ", all_documents)
         user_firstname = db.query(models.models.User.first_name).filter(
             models.models.User.username == username).scalar()
-        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents":all_documents})
+        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_list}})
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 
+@app.get("/show_pdf/{document_id}")
+async def show_document(document_id:str, request: Request, authorization: str = Header(None, alias="Authorization"),
+                        db: Session = Depends(get_db)):
+    print("Authorization in show_pdf:", authorization)
+    print("document_id: ",document_id)
+    username = check_authorization(authorization)
+    if username:
+        v_db = lang_chain.get_user_store(username)
+        filters = {
+            "$and": [
+                {"username": {"$eq": username}},
+                {"document_id": {"$eq": document_id}},
+            ]
+        }
+        document = v_db.get(
+            where=filters
+        )
+        print("file_path: ",document["metadatas"][0]["file_path"])
+        file_path = document["metadatas"][0]["file_path"]
+        #return templates.TemplateResponse("dashboard.html", {"request": request, "document": "This is test"})
+        try:
+            return FileResponse(
+                file_path,
+                media_type="application/pdf"
+            )
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="File not found")
+    
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):

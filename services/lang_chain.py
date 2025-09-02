@@ -130,7 +130,10 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size:
         print("Error: Document is empty or could not be processed.")
         return 0
     for chunk in chunks:
+        # Generate a unique ID for the document
+        document_id = str(uuid.uuid4())
         chunk.metadata["username"] = username
+        chunk.metadata["document_id"] = document_id
         chunk.metadata["source_key"] = create_source_key(username,file_name)
         chunk.metadata["file_name"] = file_name
         chunk.metadata["file_path"] = str(file_path)

@@ -18,10 +18,7 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<!-- یک کانتینر برای تزریق محتوای صفحه -->
-  <!--<main id="main-content">
-    <p>page is loading</p>
-  </main>-->
+
 <h1>account Form</h1>
 <p>Welcome, {{ firstname }}</p>
 <ul id="ul-right">
@@ -36,8 +33,7 @@
 
     <tr>
         <td>{{loop.index}}. {{ meta["file_name"] }}
-          <!--{{documents["documents"][loop.index0][:520]}}-->
-          <button class="btn" onclick="">Show Document</button>
+                <button class="btn" onclick="openDocument('{{ meta['document_id'] }}')">See Document</button>
         </td>
 
     </tr>
@@ -49,4 +45,28 @@
 
 {% block scripts %}
   <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
+  <script>
+    function openDocument(documentId) {
+  const token = localStorage.getItem("access_token");
+
+  fetch(`/show_pdf/${encodeURIComponent(documentId)}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("Unauthorized or error fetching PDF");
+    return response.blob();
+  })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Error fetching document");
+  });
+}
+  </script>
 {% endblock %}
