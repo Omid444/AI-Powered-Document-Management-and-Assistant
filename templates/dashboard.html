@@ -30,14 +30,21 @@
 
 {% for meta in documents["metadatas"] %}
   <table>
-
     <tr>
-        <td>{{loop.index}}. {{ meta["file_name"] }}
-                <button class="btn" onclick="openDocument('{{ meta['document_id'] }}')">See Document</button>
-        </td>
+      <td>
+        <!-- The new Flexbox container -->
+        <div class="table-cell-content">
+          <!-- Document name -->
+          <span>{{loop.index}}. {{ meta["file_name"] }}</span>
 
+          <!-- A div to group the buttons on the right -->
+          <div>
+            <button class="btn" onclick="openDocument('{{ meta['document_id'] }}')">See Document</button>
+            <button class="delete-btn" onclick="deleteDocument('{{ meta['document_id'] }}')">Delete Document</button>
+          </div>
+        </div>
+      </td>
     </tr>
-    <br>
   </table>
 {% endfor %}
 
@@ -68,5 +75,37 @@
     alert("Error fetching document");
   });
 }
+
+
+
+    function deleteDocument(documentId) {
+  const token = localStorage.getItem("access_token");
+
+  if (confirm("Do you really want to delete the document?")) {
+    fetch(`/delete_pdf/${encodeURIComponent(documentId)}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Unauthorized or error deleting document");
+      }
+      return response.json();  // فرض می‌کنم سرور JSON برمی‌گردونه
+    })
+    .then(data => {
+      alert("Document deleted successfully");
+      const row = document.getElementById(`row-${documentId}`);
+      if (row) row.remove();
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error deleting document");
+    });
+  }
+}
+
+
   </script>
 {% endblock %}

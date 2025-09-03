@@ -1,3 +1,5 @@
+from certifi import where
+
 import models.schemas
 import services.auth, services.open_ai_connection
 import shutil
@@ -213,7 +215,6 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
         if is_filed_saved != "File Saved":
             return JSONResponse(content={"reply": is_filed_saved})
 
-        #user_id= db.query(User.id).filter(User.username == username).scalar()
         lang_chain.turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path)
 
         return JSONResponse(content={"reply": reply["summary"]})
@@ -226,32 +227,25 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
 async def show_dashboard(request: Request, authorization: str = Header(None, alias="Authorization"),
                          db: Session = Depends(get_db)):
     print("Authorization in dashboard:", authorization)
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    username = check_authorization(authorization)
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    v_db = lang_chain.get_user_store(username)
+    all_documents = v_db.get(where={"username": username})
+    metadata_unique_list = []
 
-    token = authorization.split(" ")[1]
+    for doc in all_documents["metadatas"]:
+        doc_id_temp = ""
+        meta_data = {"file_name": doc.get("file_name"), "document_id": doc.get("document_id")}
+        print("this is metadata:", meta_data)
+        print("metadata_unique_list:", metadata_unique_list)
+        if meta_data not in metadata_unique_list:
+            metadata_unique_list.append(meta_data)
 
-    try:
-        username = services.auth.verify_token(token)
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        v_db = lang_chain.get_user_store(username)
-        all_documents = v_db.get(where={"username": username})
-        metadata_list = [
-            {
-                "file_name": doc.get("file_name"),
-                "document_id": doc.get("document_id")
-            }
-            for doc in all_documents["metadatas"]
-        ]
-
-        #print("*****this is all documents*****:    ", all_documents)
-        user_firstname = db.query(models.models.User.first_name).filter(
+    user_firstname = db.query(models.models.User.first_name).filter(
             models.models.User.username == username).scalar()
-        return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_list}})
+    return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
 
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token verification failed")
 
 
 @app.get("/show_pdf/{document_id}")
@@ -281,7 +275,32 @@ async def show_document(document_id:str, request: Request, authorization: str = 
             )
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="File not found")
-    
+
+
+@app.delete("/delete_pdf/{document_id}")
+async def show_document(document_id:str, request: Request, authorization: str = Header(None, alias="Authorization"),
+                        db: Session = Depends(get_db)):
+    print("Authorization in delete_pdf:", authorization)
+    print("document_id: ",document_id)
+    username = check_authorization(authorization)
+    if username:
+        v_db = lang_chain.get_user_store(username)
+        filters = {
+            "$and": [
+                {"username": {"$eq": username}},
+                {"document_id": {"$eq": document_id}},
+            ]
+        }
+        document = v_db.get(
+            where=filters
+        )
+
+        v_db.delete(where=filters)
+        print("file_path: ",document["metadatas"][0]["file_path"])
+        file_path = document["metadatas"][0]["file_path"]
+
+
+
 
 @app.get("/items")
 async def read_items(request: Request, authorization: str = Header(None, alias="Authorization")):
