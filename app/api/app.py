@@ -1,5 +1,4 @@
-from certifi import where
-
+import os.path
 import models.schemas
 import services.auth, services.open_ai_connection
 import shutil
@@ -298,6 +297,15 @@ async def show_document(document_id:str, request: Request, authorization: str = 
         v_db.delete(where=filters)
         print("file_path: ",document["metadatas"][0]["file_path"])
         file_path = document["metadatas"][0]["file_path"]
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return
+            else:
+                raise HTTPException(status_code=404, detail="File not found")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
 
 

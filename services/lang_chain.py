@@ -92,23 +92,40 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
     num_chunks = len(new_chunks)
     if num_chunks <= 3:
         chunks_to_compare = new_chunks
+        comparison_text = " ".join([chunk.page_content for chunk in chunks_to_compare])
+        retrieved_docs = vector_store.similarity_search_with_score(comparison_text, k=1, filter={"username": username})
+        if retrieved_docs:
+            most_similar_document, distance = retrieved_docs[0]
+            print("distance", distance)
+            print("similarity_point", similarity_point)
+            similarity = 1.0 - distance
+
+            if similarity >= similarity_point:
+                print(f"Document already exists with a similarity score of {similarity}.")
+                return True
+            else:
+                print(f"No similar document found. The highest score was {similarity}.")
+                return False
+
     else:
         chunks_to_compare.append(new_chunks[0])
         chunks_to_compare.append(new_chunks[num_chunks // 2])
         chunks_to_compare.append(new_chunks[num_chunks - 1])
-
-    comparison_text = " ".join([chunk.page_content for chunk in chunks_to_compare])
-    retrieved_docs = vector_store.similarity_search_with_score(comparison_text, k=1, filter={"username": username})
-    #print("**********retrieved_docs", retrieved_docs[0])
-    if retrieved_docs:
-        most_similar_document, distance = retrieved_docs[0]
-        print("distance",distance)
-        print("similarity_point",similarity_point)
-        similarity = 1.0 - distance
-
-        if similarity >= similarity_point:
+        similarity_list = []
+        for i in range(3):
+            retrieved_docs = (vector_store.similarity_search_with_score(chunks_to_compare[i].page_content, k=1,
+                                                                       filter={"username": username}))
+            if retrieved_docs:
+                doc, distance = retrieved_docs[0]
+                similarity = 1.0 - distance
+                similarity_list.append(similarity)
+            else:
+                similarity = 0
+                similarity_list.append(similarity)
+        if all(num > similarity_point for num in similarity_list):
             print(f"Document already exists with a similarity score of {similarity}.")
             return True
+
         else:
             print(f"No similar document found. The highest score was {similarity}.")
             return False
