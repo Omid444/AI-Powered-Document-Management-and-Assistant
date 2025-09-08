@@ -134,23 +134,12 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     print("Authorization file_upload:", authorization)
     username = check_authorization(authorization)
     if username:
-        file_name = file.filename
-        file_content, meta_data = extract_text_and_metadata(file.file)
-        is_file_duplicate = lang_chain.check_for_duplicate_document(username, file_content)
-        if is_file_duplicate:
-            return JSONResponse(content={"reply": "Your file is already exist in database,\n"
-                                                  "Do you have any question about it,\n"
-                                                  "Please let me know"})
-        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
-        file_path = create_file_path(username, file_name)
-        file.file.seek(0) # put cursor at start byte of the file to avoid missing character or lines
-        is_filed_saved  = save_file(file.file,file_path)
-        if is_filed_saved != "File Saved":
-            return JSONResponse(content={"reply": is_filed_saved})
-
-        lang_chain.turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path)
-
-        return JSONResponse(content={"reply": reply["summary"]})
+        content, file_content, meta_data = services.app_services.file_upload(username, file)
+        if all([content, file_content, meta_data]):
+            reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+            return JSONResponse(content={"reply": reply["summary"]})
+        else:
+          return JSONResponse(content={"reply": content})
 
 
 @app.get("/dashboard")
@@ -251,29 +240,19 @@ async def show_document(document_id:str, request: Request, authorization: str = 
             raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
 
+@app.post("/dashboard/upload_pdf")
+async def upload_file_button(file: UploadFile = File(...),authorization: str = Header(None, alias="Authorization"),
+        db: Session = Depends(get_db)):
 
-# @app.get("/dashboard/upload_file/")
-# async def upload_file_button(file: UploadFile = File(...), authorization: str = Header(None, alias="Authorization"), db: Session = Depends(get_db)):
-#     print("Authorization dashboard_button:", authorization)
-#     username = check_authorization(authorization)
-#     if username:
-#         file_name = file.filename
-#         file_content, meta_data = extract_text_and_metadata(file.file)
-#         is_file_duplicate = lang_chain.check_for_duplicate_document(username, file_content)
-#         if is_file_duplicate:
-#             return JSONResponse(content={"reply": "Your file is already exist in database,\n"
-#                                                   "Do you have any question about it,\n"
-#                                                   "Please let me know"})
-#         file_path = create_file_path(username, file_name)
-#         file.file.seek(0)
-#         is_filed_saved = save_file(file.file, file_path)
-#         if is_filed_saved != "File Saved":
-#             return JSONResponse(content={"reply": is_filed_saved})
-#
-#         lang_chain.turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name,
-#                                       file_path=file_path)
-#
-#         return True
+    print("Authorization upload_file_button:", authorization)
+    username = check_authorization(authorization)
+    if username:
+        content, file_content, meta_data = services.app_services.file_upload(username, file)
+        if all([content, file_content, meta_data]):
+            return {"message": "File uploaded successfully", "file_name": file.filename}
+        else:
+            return {"message": "File uploaded successfully", "file_name": file.filename}
+    raise HTTPException(status_code=400, detail="File upload failed")
 
 
 # if __name__ == "__main__":

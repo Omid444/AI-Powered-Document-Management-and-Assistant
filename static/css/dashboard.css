@@ -85,7 +85,7 @@ table {
     justify-content: center;
 
 }
-.upload-btn {
+.container .upload-btn {
   background-color: #cf2121;
   color: white;
   border: 2px solid #cf2121;
@@ -95,7 +95,7 @@ table {
 
 }
 
-.upload-btn:hover {
+.container .upload-btn:hover {
   background-color: #cf2121;
   color: white
 }

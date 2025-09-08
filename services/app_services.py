@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import FastAPI
 from db.database import SessionLocal
-
+from services.summarizer import extract_text_and_metadata
+from services.lang_chain import check_for_duplicate_document, turn_txt_to_vector
 
 app = FastAPI()
 
@@ -71,3 +72,28 @@ def check_authorization(authorization):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token verification failed")
+
+
+def file_upload(username, file):
+
+    file_name = file.filename
+    file_content, meta_data = extract_text_and_metadata(file.file)
+    is_file_duplicate = check_for_duplicate_document(username, file_content)
+    if is_file_duplicate:
+        content =  "Your file is already exist in database,\n"\
+                    "Do you have any question about it,\n"\
+                    "Please let me know"
+        return content, None, None
+
+    file_path = create_file_path(username, file_name)
+    file.file.seek(0)  # put cursor at start byte of the file to avoid missing character or lines
+    is_filed_saved = save_file(file.file, file_path)
+    if is_filed_saved != "File Saved":
+        content =  is_filed_saved
+        try:
+            turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name,
+                               file_path=file_path)
+            return content, file_content, meta_data
+        except Exception as e:
+            content = "Error occured in vector DB"
+            return content, None, None

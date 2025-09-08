@@ -29,7 +29,8 @@
   <li style="float:right"><a href="/">Logout</a></li>
 </ul>
 <div class="container">
-<button class="upload-btn" onclick="">Upload Document</button>
+  <input type="file" id="fileInput" accept="application/pdf" style="display:none;" />
+  <button class="upload-btn" onclick="triggerFileUpload()">Upload Document</button>
 </div>
 {% for meta in documents["metadatas"] %}
   <table>
@@ -82,7 +83,7 @@
 
 
     function deleteDocument(documentId) {
-  const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("access_token");
 
   if (confirm("Do you really want to delete the document?")) {
     fetch(`/delete_pdf/${encodeURIComponent(documentId)}`, {
@@ -99,6 +100,7 @@
     })
     .then(data => {
       alert("Document deleted successfully");
+      const token = localStorage.getItem("access_token");
       const row = document.getElementById(`row-${documentId}`);
       if (row) row.remove();
     })
@@ -109,6 +111,66 @@
   }
 }
 
+function triggerFileUpload() {
+  document.getElementById("fileInput").click();
+}
+
+document.getElementById("fileInput").addEventListener("change", async function () {
+  const file = this.files[0];
+  if (!file) return;
+
+  // Define the 'token' variable here, ensuring it contains your authorization token
+  const token = localStorage.getItem("access_token"); // or wherever you store it
+
+  // If the token is not found, you should handle the error
+  if (!token) {
+    alert("Authentication token not found. Please log in again.");
+    return;
+  }
+
+  // اگر کاربر PDF انتخاب نکرد
+  if (file.type !== "application/pdf") {
+    alert("Please only select PDF file");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("/dashboard/upload_pdf", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+
+  if (response.ok) {
+  alert("✅ Your file saved in database");
+
+  // دوباره لیست اسناد را از API بگیر
+  const docsResp = await fetch("/dashboard/api/documents", {
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  });
+  const docs = await docsResp.json();
+
+  // بخش HTML جدول را با داده‌های جدید بساز
+  renderDocuments(docs);
+}
+else {
+
+const errorText = await response.text();
+
+alert("❌ Error in uploading file: " + errorText);
+
+}
+  } catch (err) {
+    alert("🚨 error occured: " + err.message);
+  }
+});
 
   </script>
 {% endblock %}
