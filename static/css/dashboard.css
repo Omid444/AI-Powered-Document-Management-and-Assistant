@@ -79,3 +79,23 @@ table {
   background-color: #cf2121;
   color: white
 }
+
+.container{
+    display: flex;
+    justify-content: center;
+
+}
+.upload-btn {
+  background-color: #cf2121;
+  color: white;
+  border: 2px solid #cf2121;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius:5px;
+
+}
+
+.upload-btn:hover {
+  background-color: #cf2121;
+  color: white
+}

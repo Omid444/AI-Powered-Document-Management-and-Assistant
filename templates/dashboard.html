@@ -24,11 +24,13 @@
 <ul id="ul-right">
   <li><a href="/account" id="home-link"  onclick="mylog(event)">Home</a></li>
   <li><a href="/dashboard" class="active" id="dashboard-link" onclick="goDashboard(event)">Dashboard</a></li>
-  <<li><a href="#contact">Contact</a></li>
+  <li><a href="#contact">Contact</a></li>
   <li><a href="#about">about</a></li>
   <li style="float:right"><a href="/">Logout</a></li>
 </ul>
-
+<div class="container">
+<button class="upload-btn" onclick="">Upload Document</button>
+</div>
 {% for meta in documents["metadatas"] %}
   <table>
     <tr>
