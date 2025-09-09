@@ -14,18 +14,15 @@ class User(Base):
     #documents = relationship("Document", back_populates="owner")
 
 
-# class Document(Base):
-#     __tablename__ = "documents"
+# class Chat(Base):
+#     __tablename__ = "chatbot_history"
 #
 #     id = Column(Integer, primary_key=True, index=True)
 #     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-#     title = Column(String)
-#     #file_path = Column(String)
-#     summary = Column(String)
-#     tags = Column(JSON)
-#     is_payment = Column(Integer, nullable=True)
-#     is_tax_related = Column(Boolean, default=False)
-#     due_date = Column(Date, nullable=True)
-#     doc_date = Column(Date, nullable=True)
+#     conversation_id = Column(String, index=True)  # New: Unique ID for each conversation
+#     role = Column(String)  # New: "user" or "assistant"
+#     content = Column(String)  # New: Combines user_text and chatbot_answer
+#     timestamp = Column(DateTime)  # New: Precise date and time
+#     title = Column(String)  # Retained
 #     # vice_versa relationship
-#     owner = relationship("User", back_populates="documents")
+#     #owner = relationship("User", back_populates="documents")

@@ -251,7 +251,7 @@ async def upload_file_button(file: UploadFile = File(...),authorization: str = H
         if all([content, file_content, meta_data]):
             return {"message": "File uploaded successfully", "file_name": file.filename}
         else:
-            return {"message": "File uploaded successfully", "file_name": file.filename}
+            return {"message": "File already exist in database", "file_name": file.filename}
     raise HTTPException(status_code=400, detail="File upload failed")
 
 

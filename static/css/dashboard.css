@@ -86,16 +86,18 @@ table {
 
 }
 .container .upload-btn {
-  background-color: #cf2121;
+  font-size: 15px;
+  background-color: #1677ab;
   color: white;
-  border: 2px solid #cf2121;
-  padding: 4px 6px;
-  cursor: pointer;
+  margin: 2% auto 2% auto; /* 5% from the top, 5% from the bottom and centered */
+  border: 1px solid #888;
+  width: 350px;
+  height: 40px;
   border-radius:5px;
 
 }
 
 .container .upload-btn:hover {
-  background-color: #cf2121;
-  color: white
+  background-color: #1a96d9;
+  color: white;
 }

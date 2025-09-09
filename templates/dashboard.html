@@ -3,14 +3,14 @@
 {% block styles %}
   <link rel="stylesheet" href="{{ url_for('static', path='css/dashboard.css') }}">
   <style>
-    /* اضافه کردن استایل برای حاشیه جدول و سلول‌ها */
+
     table, th, td {
       border: 1px solid black;
       border-collapse: collapse;
-      padding: 8px; /* اضافه کردن فضای داخلی برای خوانایی بهتر */
+      padding: 8px;
     }
     table {
-      width: 100%; /* جدول تمام عرض صفحه را می‌گیرد */
+      width: 100%;
     }
   </style>
 {% endblock %}
@@ -146,30 +146,30 @@ document.getElementById("fileInput").addEventListener("change", async function (
       body: formData
     });
 
+  const result = await response.json();
+
   if (response.ok) {
-  alert("✅ Your file saved in database");
+    if (result.message === "File already exist in database") {
+      alert("⚠️ This file already exist in database");
+    } else if (result.message === "File uploaded successfully") {
+      alert("✅ File saved in database");
 
-  // دوباره لیست اسناد را از API بگیر
-  const docsResp = await fetch("/dashboard/api/documents", {
-    headers: {
-      "Authorization": `Bearer ${token}`
+
+      const docsResp = await fetch("/dashboard", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      // const docs = await docsResp.json();
+      // renderDocuments(docs);
     }
-  });
-  const docs = await docsResp.json();
-
-  // بخش HTML جدول را با داده‌های جدید بساز
-  renderDocuments(docs);
-}
-else {
-
-const errorText = await response.text();
-
-alert("❌ Error in uploading file: " + errorText);
-
-}
-  } catch (err) {
-    alert("🚨 error occured: " + err.message);
+  } else {
+    const errorText = await response.text();
+    alert("❌ Error in uploading file: " + errorText);
   }
+} catch (err) {
+  alert("🚨 Unexpected Error: " + err.message);
+}
 });
 
   </script>
