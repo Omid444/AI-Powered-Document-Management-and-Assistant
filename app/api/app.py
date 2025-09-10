@@ -1,19 +1,49 @@
 import os.path
+import uuid
+from datetime import datetime
 from services.app_services import app, templates, get_db
 import models.schemas
 import services.auth, services.open_ai_connection
-from io import BytesIO
 from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
-from models.models import User
+from models.models import User, Chat
 from sqlalchemy.orm import Session
-from services.summarizer import extract_text_and_metadata
+from sqlalchemy import select, desc
 from services import lang_chain
 from fastapi.responses import FileResponse
-from services.app_services import check_authorization, create_file_path, save_file
+from services.app_services import check_authorization
 
+@app.get("/api/chat/history")
+async  def get_chat_history(authorization: str = Header(None, alias="Authorization"),
+                         db: Session = Depends(get_db)):
+        """
+        Retrieve the last 10 chat conversations for the authorized user.
+        """
+        print("Authorization in history of chatbot", authorization)
+        username = check_authorization(authorization)
+        if not username:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
+        user = db.scalar(select(User).where(User.username == username))
+        if not user:
+            return []  # Return an empty list if user is not found
+        query = select(Chat).where(Chat.user_id == user.id).order_by(desc(Chat.timestamp)).limit(10)
+        chat_entries = db.scalars(query).all()
 
+        # Convert the SQLAlchemy objects to a list of dictionaries for JSON serialization
+        history = [
+            {
+                "id": chat.id,
+                "conversation_id": chat.conversation_id,
+                "role": chat.role,
+                "content": chat.content,
+                "timestamp": chat.timestamp.isoformat(),
+                "title": chat.title
+            }
+            for chat in chat_entries
+        ]
+        print("*************This is history: ",history)
+        return history
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -105,11 +135,37 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
     if username:
         data = await request.json()
         user_message = data.get("message", "")
+        user_id = db.query(models.models.User.id).filter(models.models.User.username == username).scalar()
+        conversation_id = str(uuid.uuid4())
+        user_chat_entry = Chat(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role="user",
+            content=user_message,
+            timestamp=datetime.now(),
+            title="New conversation"
+        )
+        db.add(user_chat_entry)
+        db.commit()
+        db.refresh(user_chat_entry)
+
         lang_chain.state.update({"question": user_message})
         print(lang_chain.state)
         retrieved_doc = lang_chain.retrieve_document(username)
         lang_chain.state.update(retrieved_doc)
         reply = lang_chain.generate()
+        ai_answer = reply["answer"]
+        assistant_chat_entry = Chat(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role="assistant",
+            content=ai_answer,
+            timestamp=datetime.now(),
+            title="New conversation"
+        )
+        db.add(assistant_chat_entry)
+        db.commit()
+        db.refresh(assistant_chat_entry)
         return JSONResponse(content={"reply": reply["answer"]})
 
 
