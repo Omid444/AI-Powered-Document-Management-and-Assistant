@@ -1,5 +1,6 @@
+from io import BytesIO
 from jose import JWTError
-from fastapi import  HTTPException
+from fastapi import HTTPException, UploadFile
 from pathlib import Path
 from services.lang_chain import create_source_key
 from services.auth import verify_token
@@ -43,18 +44,15 @@ def create_file_path(user_name, file_name):
 
 
 
-def save_file(file, file_path):
-
+def save_file(file_bytes, file_path):
     try:
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file, buffer)# type: ignore
-            return "File Saved"
+        with open(file_path, "wb") as buffer:
+            buffer.write(file_bytes)
+        return "File Saved"
     except PermissionError:
-        reply = "Permission denied."
-        return reply
-    except Exception as e :
-        reply = f"Error occurred while copying file. details:{e}"
-        return reply
+        return "Permission denied."
+    except Exception as e:
+        return f"Error occurred while copying file: {e}"
 
 
 
@@ -74,26 +72,35 @@ def check_authorization(authorization):
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 
-def file_upload(username, file):
-
+def file_upload(username, file: UploadFile):
     file_name = file.filename
-    file_content, meta_data = extract_text_and_metadata(file.file)
+
+    # Read the entire file content into an in-memory byte string once.
+    # This is the single source of truth for the file's content.
+    file_content_bytes = file.file.read()
+
+    # Pass this byte string to a new function to process and save it.
+    file_content, meta_data = extract_text_and_metadata(file_content_bytes)
+
+    # Check for duplicate document
     is_file_duplicate = check_for_duplicate_document(username, file_content)
     if is_file_duplicate:
-        content =  "Your file is already exist in database,\n"\
-                    "Do you have any question about it,\n"\
-                    "Please let me know"
+        content =  "Your file is already exist in database,\n" \
+                   "Do you have any question about it,\n" \
+                   "Please let me know"
         return content, None, None
 
     file_path = create_file_path(username, file_name)
-    file.file.seek(0)  # put cursor at start byte of the file to avoid missing character or lines
-    is_filed_saved = save_file(file.file, file_path)
-    if is_filed_saved != "File Saved":
-        content =  is_filed_saved
-        try:
-            turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name,
-                               file_path=file_path)
-            return content, file_content, meta_data
-        except Exception as e:
-            content = "Error occured in vector DB"
-            return content, None, None
+
+    # Pass the byte string to the save function.
+    is_file_saved = save_file(file_content_bytes, file_path)
+    if is_file_saved != "File Saved":
+        content = is_file_saved
+        return content, None, None
+    try:
+        content = is_file_saved
+        turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path)
+        return content, file_content, meta_data
+    except Exception as e:
+        content = "Error occurred in vector DB."
+        return content, None, None

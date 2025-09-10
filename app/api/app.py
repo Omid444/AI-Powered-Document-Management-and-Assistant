@@ -2,7 +2,7 @@ import os.path
 from services.app_services import app, templates, get_db
 import models.schemas
 import services.auth, services.open_ai_connection
-import shutil
+from io import BytesIO
 from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from models.models import User
@@ -243,7 +243,6 @@ async def show_document(document_id:str, request: Request, authorization: str = 
 @app.post("/dashboard/upload_pdf")
 async def upload_file_button(file: UploadFile = File(...),authorization: str = Header(None, alias="Authorization"),
         db: Session = Depends(get_db)):
-
     print("Authorization upload_file_button:", authorization)
     username = check_authorization(authorization)
     if username:
