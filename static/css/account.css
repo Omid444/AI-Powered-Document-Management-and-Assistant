@@ -28,7 +28,7 @@ li a:hover:not(.active) {
 }
 
 .active {
-  background-color: #04AA6D;
+  background-color: #0399a1;
 }
 
 .chatbot-frame {
@@ -92,3 +92,4 @@ li a:hover:not(.active) {
   visibility: hidden;
   opacity: 0;
 }
+

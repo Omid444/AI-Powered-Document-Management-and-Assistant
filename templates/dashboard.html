@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', path='css/dashboard.css') }}">
+  <style>
+
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 8px;
+    }
+    table {
+      width: 100%;
+    }
+  </style>
+{% endblock %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<h1>account Form</h1>
+<p>Welcome, {{ firstname }}</p>
+<ul id="ul-right">
+  <li><a href="/account" id="home-link"  onclick="mylog(event)">Home</a></li>
+  <li><a href="/dashboard" class="active" id="dashboard-link" onclick="goDashboard(event)">Dashboard</a></li>
+  <li><a href="#contact">Contact</a></li>
+  <li><a href="#about">about</a></li>
+  <li style="float:right"><a href="/">Logout</a></li>
+</ul>
+<div class="container">
+  <input type="file" id="fileInput" accept="application/pdf" style="display:none;" />
+  <button class="upload-btn" onclick="triggerFileUpload()">Upload Document</button>
+</div>
+{% for meta in documents["metadatas"] %}
+  <table>
+    <tr>
+      <td>
+        <!-- The new Flexbox container -->
+        <div class="table-cell-content">
+          <!-- Document name -->
+          <span>{{loop.index}}. {{ meta["file_name"] }}</span>
+
+          <!-- A div to group the buttons on the right -->
+          <div>
+            <button class="btn" onclick="openDocument('{{ meta['document_id'] }}')">See Document</button>
+            <button class="delete-btn" onclick="deleteDocument('{{ meta['document_id'] }}')">Delete Document</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
+  <script>
+    function openDocument(documentId) {
+  const token = localStorage.getItem("access_token");
+
+  fetch(`/show_pdf/${encodeURIComponent(documentId)}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("Unauthorized or error fetching PDF");
+    return response.blob();
+  })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Error fetching document");
+  });
+}
+
+
+
+    function deleteDocument(documentId) {
+    const token = localStorage.getItem("access_token");
+
+  if (confirm("Do you really want to delete the document?")) {
+    fetch(`/delete_pdf/${encodeURIComponent(documentId)}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Unauthorized or error deleting document");
+      }
+      return response.json();  // فرض می‌کنم سرور JSON برمی‌گردونه
+    })
+    .then(data => {
+      alert("Document deleted successfully");
+      const token = localStorage.getItem("access_token");
+      const row = document.getElementById(`row-${documentId}`);
+      if (row) row.remove();
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error deleting document");
+    });
+  }
+}
+
+function triggerFileUpload() {
+  document.getElementById("fileInput").click();
+}
+
+document.getElementById("fileInput").addEventListener("change", async function () {
+  const file = this.files[0];
+  if (!file) return;
+
+  // Define the 'token' variable here, ensuring it contains your authorization token
+  const token = localStorage.getItem("access_token"); // or wherever you store it
+
+  // If the token is not found, you should handle the error
+  if (!token) {
+    alert("Authentication token not found. Please log in again.");
+    return;
+  }
+
+  // اگر کاربر PDF انتخاب نکرد
+  if (file.type !== "application/pdf") {
+    alert("Please only select PDF file");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("/dashboard/upload_pdf", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+
+  const result = await response.json();
+
+  if (response.ok) {
+    if (result.message === "File already exist in database") {
+      alert("⚠️ This file already exist in database");
+    } else if (result.message === "File uploaded successfully") {
+      alert("✅ File saved in database");
+
+
+      const docsResp = await fetch("/dashboard", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      // const docs = await docsResp.json();
+      // renderDocuments(docs);
+    }
+  } else {
+    const errorText = await response.text();
+    alert("❌ Error in uploading file: " + errorText);
+  }
+} catch (err) {
+  alert("🚨 Unexpected Error: " + err.message);
+}
+});
+
+  </script>
+{% endblock %}
