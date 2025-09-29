@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Date, JSON, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Date, JSON, DateTime, Float, Text
 from sqlalchemy.orm import relationship
 from db.database import Base
 
@@ -6,13 +6,14 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String)
-    last_name = Column(String)
+    first_name = Column(String(100))
+    last_name = Column(String(100))
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, index=True, nullable=False)
-    #documents = relationship("Document", back_populates="owner")
 
+    #documents = relationship("Document", back_populates="user", lazy="selectin")
+    chats = relationship("Chat", back_populates="user", lazy="selectin")
 
 class Chat(Base):
     __tablename__ = "chatbot_history"
@@ -20,9 +21,24 @@ class Chat(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     conversation_id = Column(String, index=True)  # New: Unique ID for each conversation
-    role = Column(String)  # New: "user" or "assistant"
-    content = Column(String)  # New: Combines user_text and chatbot_answer
-    timestamp = Column(DateTime)  # New: Precise date and time
-    title = Column(String)  # Retained
-    # vice_versa relationship
-    #owner = relationship("User", back_populates="documents")
+    role = Column(String(100))  # "user" or "assistant"
+    content = Column(Text)  # Combines user_text and chatbot_answer
+    timestamp = Column(DateTime)  # Precise date and time
+    title = Column(String(255))  # Retained
+
+    user = relationship("User", back_populates="chats")
+
+
+# class Document(Base):
+#     __tablename__ = "documents"
+#
+#     id = Column(Integer, primary_key=True, index=True)
+#     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+#     title = Column(String(255), nullable=True)
+#     summary = Column(Text, nullable=True)
+#     is_payment = Column(Float, nullable=True)
+#     is_tax_related = Column(Boolean, nullable=True)
+#     due_date = Column(Date, nullable=True)
+#     doc_date = Column(Date, nullable=True)
+#
+#     user = relationship("User", back_populates="documents", lazy="joined")

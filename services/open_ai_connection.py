@@ -1,14 +1,26 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from pydantic import BaseModel
+from typing import Optional, Dict
 import json
 load_dotenv()
 apikey = os.getenv("OPENAI_KEY")
-print(apikey)
+
 client = OpenAI(api_key=os.getenv("OPENAI_KEY"))
 
+
+class DocumentSummary(BaseModel):
+    title: str
+    summary: str
+    tags: Optional[Dict[str, str]] = None
+    is_payment: Optional[float] = None
+    is_tax_related: Optional[bool] = None
+    due_date: Optional[str] = None   # ISO date: YYYY-MM-DD
+    doc_date: Optional[str] = None   # ISO date: YYYY-MM-DD
+
 def file_upload_llm(user_message, meta_data=""):
-    response = client.chat.completions.create(
+    completion = client.chat.completions.parse(
         model="gpt-4o-mini",  #  gpt-4-vision-preview
         messages=[
             {
@@ -18,7 +30,7 @@ def file_upload_llm(user_message, meta_data=""):
                 f"use the metadata of document which is provided here:{meta_data} to provide detailed reply."
                 f"focus on important details of metadata more, something like due date or payment amount"
                 f"and remember always write it in second person format"
-                f"also return a JSON object with the following fields:\n"
+                f"also Return the result strictly in the defined JSON structure.\n"
                     "- title: A short title based on the text, String format\n"
                     "- summary: A three-line or more explanation in second person format. Use provided metadata to improve accuracy. String Format\n"
                     "- tags: dictionary of metadata. dictionary format"       
@@ -29,15 +41,17 @@ def file_upload_llm(user_message, meta_data=""):
             },
             {"role": "user", "content": user_message}
         ],
-        max_tokens=300,
-        response_format={"type": "json_object"}
+        max_tokens=1000,
+        response_format=DocumentSummary,
     )
 
-    print(response.choices[0].message.content)
-    raw_text = response.choices[0].message.content
-    data = json.loads(raw_text)
-    print(data)
-    return data
+    #print(response.choices[0].message.content)
+    #raw_text = response.choices[0].message.content
+    #data = json.loads(raw_text)
+    #print(data)
+    print(type(completion.choices[0].message.parsed))
+    print(completion.choices[0].message.parsed.summary)
+    return completion.choices[0].message.parsed
 
 
 def ask_ai(user_message):
@@ -55,3 +69,4 @@ def ask_ai(user_message):
 
     response_data = response.choices[0].message.content
     return response_data
+

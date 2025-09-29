@@ -8,50 +8,30 @@ from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from models.models import User, Chat
 from sqlalchemy.orm import Session
-from sqlalchemy import select, desc
+from sqlalchemy import select, asc
 from services import lang_chain
 from fastapi.responses import FileResponse
 from services.app_services import check_authorization
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 
-@app.get("/api/chat/history")
-async  def get_chat_history(authorization: str = Header(None, alias="Authorization"),
-                         db: Session = Depends(get_db)):
-        """
-        Retrieve the last 10 chat conversations for the authorized user.
-        """
-        print("Authorization in history of chatbot", authorization)
-        username = check_authorization(authorization)
-        if not username:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+origins = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]
 
-        user = db.scalar(select(User).where(User.username == username))
-        if not user:
-            return []  # Return an empty list if user is not found
-        query = select(Chat).where(Chat.user_id == user.id).order_by(desc(Chat.timestamp)).limit(10)
-        chat_entries = db.scalars(query).all()
-
-        # Convert the SQLAlchemy objects to a list of dictionaries for JSON serialization
-        history = [
-            {
-                "id": chat.id,
-                "conversation_id": chat.conversation_id,
-                "role": chat.role,
-                "content": chat.content,
-                "timestamp": chat.timestamp.isoformat(),
-                "title": chat.title
-            }
-            for chat in chat_entries
-        ]
-        print("*************This is history: ",history)
-        return history
+app.add_middleware(CORSMiddleware, allow_origins=origins,
+               allow_credentials=True,allow_methods=["*"],
+               allow_headers=["*"])
 
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    """
-    Render the home page with a greeting message.
-    """
-    return templates.TemplateResponse("home.html", {"request": request, "message": "Hello, World!"})
+
+# @app.get("/", response_class=HTMLResponse)
+# async def read_root(request: Request):
+#     """
+#     Render the home page with a greeting message.
+#     """
+#     return templates.TemplateResponse("home.html", {"request": request, "message": "Hello, World!"})
 
 
 
@@ -92,35 +72,42 @@ async def signup(user: models.schemas.UserCreate, db: Session = Depends(get_db))
 
 
 @app.post("/login")
-async def login(user: models.schemas.UserLogin, db: Session = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Authenticate a user and return a JWT access token.
     """
-    db_username = db.query(User.username).filter(User.username == user.username).scalar()
-    db_hashed_password = db.query(User.hashed_password).filter(User.username == user.username).scalar()
+    username = form_data.username
+    password = form_data.password
+    db_username = db.query(User.username).filter(User.username == username).scalar()
+    db_hashed_password = db.query(User.hashed_password).filter(User.username == username).scalar()
     if not db_username or db_hashed_password is None:
         raise HTTPException(status_code=401, detail="Username or Password is incorrect")
-    is_pass_verified = services.auth.verify_password(user.password, db_hashed_password)
+    is_pass_verified = services.auth.verify_password(password, db_hashed_password)
     if not is_pass_verified:
         raise HTTPException(status_code=401, detail="Username or Password is incorrect")
-    access_token = services.auth.create_access_token(data={"sub": user.username})
+    access_token = services.auth.create_access_token(data={"sub": username})
     print("access_token", access_token)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/account")
-async def account(request: Request, authorization: str = Header(None, alias="Authorization"),
+async def account(authorization: str = Header(None, alias="Authorization"),
                   db: Session = Depends(get_db)):
     """
     Render the account page for the authenticated user.
     """
+    username = check_authorization(authorization)
+    current_date = datetime.now()
+    lang_chain.state.update({"question": f"Today date is {current_date} I need to find every documents their due date"
+                                         f"is on month later of today"})
+    retrieved_doc = lang_chain.retrieve_document(username)
     print("Authorization in account:", authorization)
     username = check_authorization(authorization)
     if username:
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
     user_firstname = db.query(models.models.User.first_name).filter(models.models.User.username == username).scalar()
-    return templates.TemplateResponse("account.html", {"request": request, "firstname": user_firstname.title()})
+    return {"firstname":user_firstname}
 
 
 
@@ -143,7 +130,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
             role="user",
             content=user_message,
             timestamp=datetime.now(),
-            title="New conversation"
+            title="chat history user"
         )
         db.add(user_chat_entry)
         db.commit()
@@ -161,7 +148,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
             role="assistant",
             content=ai_answer,
             timestamp=datetime.now(),
-            title="New conversation"
+            title="chat history bot"
         )
         db.add(assistant_chat_entry)
         db.commit()
@@ -169,15 +156,38 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
         return JSONResponse(content={"reply": reply["answer"]})
 
 
+@app.get("/api/chat/history")
+async  def get_chat_history(authorization: str = Header(None, alias="Authorization"),
+                         db: Session = Depends(get_db)):
+        """
+        Retrieve the last 10 chat conversations for the authorized user.
+        """
+        print("Authorization in history of chatbot", authorization)
+        username = check_authorization(authorization)
+        if not username:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
-@app.get("/chatbot")
-async def chatbot(request: Request, authorization: str = Header(None, alias="Authorization")):
-    """
-    Render the chatbot page template.
-    """
-    print("Authorization in chatbot:", authorization)
-    return templates.TemplateResponse("chatbot.html",{"request": request})
+        user = db.scalar(select(User).where(User.username == username))
+        if not user:
+            return []  # Return an empty list if user is not found
+        query = select(Chat).where(Chat.user_id == user.id).order_by(asc(Chat.timestamp)).limit(50)
+        chat_entries = db.scalars(query).all()
+        #chat_entries = sorted(user.chats, key=lambda c:c.timestamp)[:50]
 
+        # Convert the SQLAlchemy objects to a list of dictionaries for JSON serialization
+        history = [
+            {
+                "id": chat.id,
+                "conversation_id": chat.conversation_id,
+                "role": chat.role,
+                "content": chat.content,
+                "timestamp": chat.timestamp.isoformat(),
+                "title": chat.title
+            }
+            for chat in chat_entries
+        ]
+        #print("*************This is history: ",history)
+        return history
 
 
 @app.post("/api/file_upload")
@@ -191,9 +201,22 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     username = check_authorization(authorization)
     if username:
         content, file_content, meta_data = services.app_services.file_upload(username, file)
+        user_id = db.query(models.models.User.id).filter(models.models.User.username == username).scalar()
+        conversation_id = str(uuid.uuid4())
         if all([content, file_content, meta_data]):
             reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
-            return JSONResponse(content={"reply": reply["summary"]})
+            assistant_chat_entry = Chat(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=reply.summary,
+                timestamp=datetime.now(),
+                title="chat history upload file"
+            )
+            db.add(assistant_chat_entry)
+            db.commit()
+            db.refresh(assistant_chat_entry)
+            return JSONResponse(content={"reply": reply.summary})
         else:
           return JSONResponse(content={"reply": content})
 
@@ -222,12 +245,12 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
 
     user_firstname = db.query(models.models.User.first_name).filter(
             models.models.User.username == username).scalar()
-    return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
-
+    #return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
+    return {"documents":metadata_unique_list}
 
 
 @app.get("/show_pdf/{document_id}")
-async def show_document(document_id:str, request: Request, authorization: str = Header(None, alias="Authorization"),
+async def show_document(document_id:str, authorization: str = Header(None, alias="Authorization"),
                         db: Session = Depends(get_db)):
     """
     Return the requested PDF file for the authenticated user.

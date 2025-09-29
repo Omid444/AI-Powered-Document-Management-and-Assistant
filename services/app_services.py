@@ -55,6 +55,10 @@ def save_file(file_bytes, file_path):
         return f"Error occurred while copying file: {e}"
 
 
+# def insert_document():
+#     """Insert document properties in documents table."""
+
+
 
 def check_authorization(authorization):
     if authorization is None or not authorization.startswith("Bearer "):
