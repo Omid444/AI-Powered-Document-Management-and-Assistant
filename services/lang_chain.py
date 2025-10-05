@@ -1,5 +1,6 @@
 import getpass
 import os, re ,uuid
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
@@ -134,7 +135,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
     return False
 
 
-def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
+def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, is_payment, is_tax_related, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
 
     vector_store = get_user_store(username, emb=emb)
     text_splitter = RecursiveCharacterTextSplitter(
@@ -154,6 +155,11 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size:
         chunk.metadata["source_key"] = create_source_key(username,file_name)
         chunk.metadata["file_name"] = file_name
         chunk.metadata["file_path"] = str(file_path)
+        chunk.metadata["due_date"] = due_date
+        chunk.metadata["due_date_ts"] = datetime.fromisoformat(due_date).timestamp()
+        chunk.metadata["is_payment"] = is_payment
+        chunk.metadata["is_tax_related"] = is_tax_related
+
 
     vector_store.add_documents(chunks)
     #Persist to disk so the index survives restarts
@@ -162,11 +168,32 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size:
     return len(chunks)
 
 
-# Define application steps
+
 def retrieve_document(username, state: State = state, k=1):
     vector_store = get_user_store(username, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k, filter={"username": username})
     return {"context": retrieved_docs}
+
+
+def retrieve_due_date_documents(username):
+    vector_store = get_user_store(username, emb=emb)
+    today = datetime.now()
+    a_month_from_now = today + timedelta(days=30)
+    filter_query = {
+        "$and": [
+            {"username": username},
+            {"due_date_ts": {"$gte": today.timestamp()}},
+            {"due_date_ts": {"$lte": a_month_from_now.timestamp()}}
+        ]
+    }
+    results = vector_store.get(where=filter_query)
+    unique_docs = {}
+    for meta, doc in zip(results["metadatas"], results["documents"]):
+        doc_id = meta.get("document_id")
+        if doc_id not in unique_docs:
+            unique_docs[doc_id] = {"metadata": meta, "document": doc}
+
+    return list(unique_docs.values())
 
 
 def generate(state: State=state):

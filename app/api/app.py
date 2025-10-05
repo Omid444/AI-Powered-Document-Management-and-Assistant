@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from models.models import User, Chat
 from sqlalchemy.orm import Session
 from sqlalchemy import select, asc
-from services import lang_chain
+from services import lang_chain, summarizer
 from fastapi.responses import FileResponse
 from services.app_services import check_authorization
 from fastapi.middleware.cors import CORSMiddleware
@@ -97,17 +97,21 @@ async def account(authorization: str = Header(None, alias="Authorization"),
     Render the account page for the authenticated user.
     """
     username = check_authorization(authorization)
-    current_date = datetime.now()
-    lang_chain.state.update({"question": f"Today date is {current_date} I need to find every documents their due date"
-                                         f"is on month later of today"})
-    retrieved_doc = lang_chain.retrieve_document(username)
+
+    # lang_chain.state.update({"question": f"Today date is {current_date} I need to find every documents that their due_date"
+    #                                      f"is one month later of today.each document must have different document_id."
+    #                                      f"if due_date is None or null or empty do not return"})
+    #retrieved_docs = lang_chain.retrieve_document(username, k=4)
+    #print("retried_docs",retrieved_docs)
+    retrieved_docs = lang_chain.retrieve_due_date_documents(username)
     print("Authorization in account:", authorization)
     username = check_authorization(authorization)
     if username:
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
     user_firstname = db.query(models.models.User.first_name).filter(models.models.User.username == username).scalar()
-    return {"firstname":user_firstname}
+    print("***********This is retrieved docs",retrieved_docs)
+    return {"firstname":user_firstname, "retrieved_docs":retrieved_docs}
 
 
 
@@ -200,11 +204,18 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     print("Authorization file_upload:", authorization)
     username = check_authorization(authorization)
     if username:
-        content, file_content, meta_data = services.app_services.file_upload(username, file)
+        file_name = file.filename
+        file_content_bytes = file.file.read()
+
+        # Pass this byte string to a new function to process and save it.
+        file_content, meta_data = services.summarizer.extract_text_and_metadata(file_content_bytes)
+        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+        content, file_content, meta_data =services.app_services.file_upload(username=username, file_name=file_name, file_content=file_content,
+                                                                            file_content_bytes=file_content_bytes, meta_data=meta_data,
+                                                                            due_date=reply.due_date, is_payment=reply.is_payment, is_tax_related=reply.is_tax_related)
         user_id = db.query(models.models.User.id).filter(models.models.User.username == username).scalar()
         conversation_id = str(uuid.uuid4())
         if all([content, file_content, meta_data]):
-            reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
             assistant_chat_entry = Chat(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -236,10 +247,10 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
     metadata_unique_list = []
 
     for doc in all_documents["metadatas"]:
-        doc_id_temp = ""
+        #doc_id_temp = ""
         meta_data = {"file_name": doc.get("file_name"), "document_id": doc.get("document_id")}
-        print("this is metadata:", meta_data)
-        print("metadata_unique_list:", metadata_unique_list)
+        #print("this is metadata:", meta_data)
+        #print("metadata_unique_list:", metadata_unique_list)
         if meta_data not in metadata_unique_list:
             metadata_unique_list.append(meta_data)
 

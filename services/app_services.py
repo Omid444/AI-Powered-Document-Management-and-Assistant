@@ -76,15 +76,10 @@ def check_authorization(authorization):
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 
-def file_upload(username, file: UploadFile):
-    file_name = file.filename
+def file_upload(username, file_name, file_content,
+                file_content_bytes, meta_data,
+                due_date, is_payment, is_tax_related):
 
-    # Read the entire file content into an in-memory byte string once.
-    # This is the single source of truth for the file's content.
-    file_content_bytes = file.file.read()
-
-    # Pass this byte string to a new function to process and save it.
-    file_content, meta_data = extract_text_and_metadata(file_content_bytes)
 
     # Check for duplicate document
     is_file_duplicate = check_for_duplicate_document(username, file_content)
@@ -103,7 +98,8 @@ def file_upload(username, file: UploadFile):
         return content, None, None
     try:
         content = is_file_saved
-        turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path)
+        turn_txt_to_vector(username=username, raw_document=file_content, file_name=file_name, file_path=file_path,
+                           due_date=due_date, is_payment=is_payment, is_tax_related=is_tax_related)
         return content, file_content, meta_data
     except Exception as e:
         content = "Error occurred in vector DB."

@@ -13,7 +13,12 @@ def extract_text_and_metadata(file_bytes: bytes):
             full_text += page_text + "\n"
 
     meta_data = reader.metadata
-    full_metadata = {key: value for key, value in meta_data.items()}
+    try:
+        full_metadata = {key: value for key, value in meta_data.items()}
+
+    except Exception:
+        full_metadata = {None:None}
+
 
     return full_text, full_metadata
 

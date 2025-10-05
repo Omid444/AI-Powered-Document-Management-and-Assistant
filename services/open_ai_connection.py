@@ -25,7 +25,7 @@ def file_upload_llm(user_message, meta_data=""):
         messages=[
             {
                 "role": "system",
-                "content": f"You are a helpful assistant. at first explains in three or more lines (if needed) about this text."
+                "content": f"You are a helpful assistant. answer in less than 500 words. at first explains in three or more lines (if needed) about this text."
                 " It is a document belongs to me, summarize this text for me to make it more simple and understandable"
                 f"use the metadata of document which is provided here:{meta_data} to provide detailed reply."
                 f"focus on important details of metadata more, something like due date or payment amount"
