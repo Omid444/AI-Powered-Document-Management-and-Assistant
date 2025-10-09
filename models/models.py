@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Date, JSON, DateTime, Float, Text
 from sqlalchemy.orm import relationship
 from db.database import Base
-
+from datetime import datetime
 class User(Base):
     __tablename__ = "users"
 
@@ -29,6 +29,15 @@ class Chat(Base):
     user = relationship("User", back_populates="chats")
 
 
+class UserDocumentMeta(Base):
+    __tablename__ = "user_document_meta"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True, nullable=False)
+    document_id = Column(String, index=True, nullable=False)
+    is_tax_related = Column(Boolean, default=False)
+    is_closed = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 # class Document(Base):
 #     __tablename__ = "documents"
 #

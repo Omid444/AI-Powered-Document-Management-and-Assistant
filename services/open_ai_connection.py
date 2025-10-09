@@ -19,7 +19,7 @@ class DocumentSummary(BaseModel):
     due_date: Optional[str] = None   # ISO date: YYYY-MM-DD
     doc_date: Optional[str] = None   # ISO date: YYYY-MM-DD
 
-def file_upload_llm(user_message, meta_data=""):
+def file_upload_llm(file_message, meta_data=""):
     completion = client.chat.completions.parse(
         model="gpt-4o-mini",  #  gpt-4-vision-preview
         messages=[
@@ -39,7 +39,7 @@ def file_upload_llm(user_message, meta_data=""):
                     "- due_date: If the deadline date is specified in document for payment write date in date format in ISO format (YYYY-MM-DD), otherwise null\n"       
                     "- doc_date: If the document's date of publishing is there in document write date in date format in ISO format (YYYY-MM-DD), otherwise null"
             },
-            {"role": "user", "content": user_message}
+            {"role": "user", "content": file_message}
         ],
         max_tokens=1000,
         response_format=DocumentSummary,

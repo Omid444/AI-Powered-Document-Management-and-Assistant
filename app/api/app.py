@@ -3,10 +3,10 @@ import uuid
 from datetime import datetime
 from services.app_services import app, templates, get_db
 import models.schemas
-import services.auth, services.open_ai_connection
+import services.auth, services.open_ai_connection, services.gemini_connection
 from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
-from models.models import User, Chat
+from models.models import User, Chat, UserDocumentMeta
 from sqlalchemy.orm import Session
 from sqlalchemy import select, asc
 from services import lang_chain, summarizer
@@ -110,9 +110,67 @@ async def account(authorization: str = Header(None, alias="Authorization"),
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
     user_firstname = db.query(models.models.User.first_name).filter(models.models.User.username == username).scalar()
-    print("***********This is retrieved docs",retrieved_docs)
-    return {"firstname":user_firstname, "retrieved_docs":retrieved_docs}
+    metas = {m.document_id: m for m in db.query(UserDocumentMeta).filter_by(username=username).all()}
 
+    final_docs = []
+    for doc in retrieved_docs:
+        doc_id = doc["metadata"]["document_id"]
+        meta = metas.get(doc_id)
+
+        # اگر در جدول بسته شده بود → ردش کن
+        if meta and meta.is_closed:
+            continue
+
+        enriched = {
+            "file_name": doc["metadata"]["file_name"],
+            "due_date": doc["metadata"]["due_date"],
+            "document_id": doc["metadata"]["document_id"],
+            "content": doc["document"],
+            "is_payment": doc["metadata"].get("is_payment"),
+            "is_tax_related": meta.is_tax_related if meta else False
+        }
+        final_docs.append(enriched)
+    print("Final Doccccccccccc", final_docs)
+    #print("***********This is retrieved docs",retrieved_docs)
+    return {"firstname":user_firstname, "retrieved_docs":final_docs}
+
+
+@app.post("/alerts/toggle_tax/{document_id}")
+async def toggle_tax_related(document_id: str,
+                             authorization: str = Header(None, alias="Authorization"),
+                             db: Session = Depends(get_db)):
+    username = check_authorization(authorization)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    meta = db.query(UserDocumentMeta).filter_by(username=username, document_id=document_id).first()
+    if not meta:
+        meta = UserDocumentMeta(username=username, document_id=document_id, is_tax_related=True)
+        db.add(meta)
+        new_value = True
+    else:
+        meta.is_tax_related = not meta.is_tax_related
+        new_value = meta.is_tax_related
+    db.commit()
+    return {"document_id": document_id, "is_tax_related": new_value}
+
+
+@app.post("/alerts/close/{document_id}")
+async def close_alert(document_id: str,
+                      authorization: str = Header(None, alias="Authorization"),
+                      db: Session = Depends(get_db)):
+    username = check_authorization(authorization)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    meta = db.query(UserDocumentMeta).filter_by(username=username, document_id=document_id).first()
+    if not meta:
+        meta = UserDocumentMeta(username=username, document_id=document_id, is_closed=True)
+        db.add(meta)
+    else:
+        meta.is_closed = True
+    db.commit()
+    return {"document_id": document_id, "is_closed": True}
 
 
 @app.post("/api/chat")
@@ -141,10 +199,11 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
         db.refresh(user_chat_entry)
 
         lang_chain.state.update({"question": user_message})
-        print(lang_chain.state)
+        #print(lang_chain.state)
         retrieved_doc = lang_chain.retrieve_document(username)
+        print("____????????????? This is retrieve doc in chat",retrieved_doc)
         lang_chain.state.update(retrieved_doc)
-        reply = lang_chain.generate()
+        reply = lang_chain.generate(retrieved_doc)
         ai_answer = reply["answer"]
         assistant_chat_entry = Chat(
             user_id=user_id,
@@ -209,7 +268,8 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
 
         # Pass this byte string to a new function to process and save it.
         file_content, meta_data = services.summarizer.extract_text_and_metadata(file_content_bytes)
-        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+        #reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+        reply = services.gemini_connection.file_upload_llm_gemini(file_content, meta_data)
         content, file_content, meta_data =services.app_services.file_upload(username=username, file_name=file_name, file_content=file_content,
                                                                             file_content_bytes=file_content_bytes, meta_data=meta_data,
                                                                             due_date=reply.due_date, is_payment=reply.is_payment, is_tax_related=reply.is_tax_related)
@@ -244,19 +304,43 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
         raise HTTPException(status_code=401, detail="Invalid token payload")
     v_db = lang_chain.get_user_store(username)
     all_documents = v_db.get(where={"username": username})
+    metas_from_db = (
+        db.query(models.models.UserDocumentMeta)
+        .filter(models.models.UserDocumentMeta.username == username)
+        .all()
+    )
+    user_firstname = db.query(models.models.User.first_name).filter(
+        models.models.User.username == username).scalar()
+    metas_dict = {m.document_id: m for m in metas_from_db}
     metadata_unique_list = []
 
-    for doc in all_documents["metadatas"]:
-        #doc_id_temp = ""
-        meta_data = {"file_name": doc.get("file_name"), "document_id": doc.get("document_id")}
-        #print("this is metadata:", meta_data)
-        #print("metadata_unique_list:", metadata_unique_list)
-        if meta_data not in metadata_unique_list:
-            metadata_unique_list.append(meta_data)
+    seen_ids = set()
 
-    user_firstname = db.query(models.models.User.first_name).filter(
-            models.models.User.username == username).scalar()
-    #return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
+    for doc in all_documents["metadatas"]:
+        doc_id = doc.get("document_id")
+        if not doc_id or doc_id in seen_ids:
+            continue
+        seen_ids.add(doc_id)
+
+        meta_data = {
+            "file_name": doc.get("file_name"),
+            "document_id": doc_id,
+            "due_date": doc.get("due_date"),
+            "is_payment": doc.get("is_payment"),
+            "is_tax_related": doc.get("is_tax_related", False),
+            "is_closed": False
+        }
+        if doc_id in metas_dict:
+            meta_sql = metas_dict[doc_id]
+            if meta_sql.is_tax_related is not None:
+                meta_data["is_tax_related"] = meta_sql.is_tax_related
+            if meta_sql.is_closed is not None:
+                meta_data["is_closed"] = meta_sql.is_closed
+
+            # فقط سندهای باز (is_closed = False)
+        if not meta_data["is_closed"]:
+            metadata_unique_list.append(meta_data)
+        #return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
     return {"documents":metadata_unique_list}
 
 
@@ -266,8 +350,8 @@ async def show_document(document_id:str, authorization: str = Header(None, alias
     """
     Return the requested PDF file for the authenticated user.
     """
-    print("Authorization in show_pdf:", authorization)
-    print("document_id: ",document_id)
+    #print("Authorization in show_pdf:", authorization)
+    #print("document_id: ",document_id)
     username = check_authorization(authorization)
     if username:
         v_db = lang_chain.get_user_store(username)

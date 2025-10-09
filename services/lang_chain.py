@@ -5,21 +5,35 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
+PROVIDER = "gemini"
+#PROVIDER = "openai"
+if PROVIDER == "openai":
+    if not os.environ.get("OPENAI_KEY"):
+        os.environ["OPENAI_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+#llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-if not os.environ.get("OPENAI_KEY"):
-  os.environ["OPENAI_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+if PROVIDER == "gemini":
+    if not os.environ.get("GOOGLE_API_KEY"):   # ✅ Gemini
+        os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
-llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+#llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-emb = OpenAIEmbeddings(model="text-embedding-3-large")
+# emb = OpenAIEmbeddings(model="text-embedding-3-large")
+#emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # ✅ Gemini
 
+if PROVIDER == "openai":
+    llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+    emb = OpenAIEmbeddings(model="text-embedding-3-large")
+elif PROVIDER == "gemini":
+    llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   # ✅ Gemini LLM
+    emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Define state for application
 class State(TypedDict):
@@ -159,6 +173,7 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, i
         chunk.metadata["due_date_ts"] = datetime.fromisoformat(due_date).timestamp()
         chunk.metadata["is_payment"] = is_payment
         chunk.metadata["is_tax_related"] = is_tax_related
+        chunk.metadata["is_closed"] = False
 
 
     vector_store.add_documents(chunks)
@@ -183,57 +198,53 @@ def retrieve_due_date_documents(username):
         "$and": [
             {"username": username},
             {"due_date_ts": {"$gte": today.timestamp()}},
-            {"due_date_ts": {"$lte": a_month_from_now.timestamp()}}
+            {"due_date_ts": {"$lte": a_month_from_now.timestamp()}},
+            {"is_closed": False}
         ]
     }
     results = vector_store.get(where=filter_query)
     unique_docs = {}
+    print("-------resluts",results)
     for meta, doc in zip(results["metadatas"], results["documents"]):
         doc_id = meta.get("document_id")
-        if doc_id not in unique_docs:
-            unique_docs[doc_id] = {"metadata": meta, "document": doc}
+        # Looking for starting_index with 0 value
+        if meta.get("start_index", 9999) == 0:
+            unique_docs[doc_id] = {
+                "metadata": meta,
+                "document": doc
+            }
+        # If starting_index with 0 value not found
+        elif doc_id not in unique_docs:
+            unique_docs[doc_id] = {
+                "metadata": meta,
+                "document": doc
+            }
 
     return list(unique_docs.values())
 
 
-def generate(state: State=state):
-    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+
+def generate(state: State):
+    question = state.get("question", "")
+    context_docs = state.get("context", [])
+
+    docs_content = []
+    for doc in context_docs:
+        meta_str = "\n".join([f"{k}: {v}" for k, v in (doc.metadata or {}).items()])
+        docs_content.append(f"Metadata:\n{meta_str}\n\nContent:\n{doc.page_content}")
+    docs_content = "\n\n".join(docs_content)
+
     prompt = ChatPromptTemplate.from_messages([
-    ("system", "Use only the provided context. "
-               "If insufficient, ask related question to gather more information that you need "
-               "Output must be ONLY the answer in a few sentences)."),
-    ("human",  "Question: {question}\n\nContext:\n{context}")
-])
-    messages = prompt.invoke({"question": state["question"], "context": docs_content})
+        ("system",
+         "Use only the provided context and metadata (username, due_date, is_tax_related, "
+         "is_payment, etc.) carefully. "
+         "If the information is insufficient, ask a clarifying question. "
+         "Output must be ONLY the answer in a few sentences."),
+        ("human", "Question: {question}\n\nContext:\n{context}")
+    ])
+
+    messages = prompt.invoke({"question": question, "context": docs_content})
     response = llm.invoke(messages)
     return {"answer": response.content}
 
 
-# Compile application and test
-# graph_builder = StateGraph(State).add_sequence([retrieve, generate])
-# graph_builder.add_edge(START, "retrieve")
-# graph = graph_builder.compile()
-
-# if __name__ == "__main__":
-#     user = "test_user"
-#
-#
-#     raw_text = """
-#     my name is kulo I live in tourta. I am 25 yearsoll.
-#     I love island.
-#     """
-#
-#     # ۱) تبدیل متن به بردار و ذخیره
-#     chunks_count = turn_txt_to_vector(user, raw_text)
-#     print(f"✅ {chunks_count} chunks added to vector store.")
-#
-#     # ۲) ساخت State اولیه
-#     state: State = {
-#         "question": "where do I live?",
-#         "context": [],
-#         "answer": ""
-#     }
-#
-#     ret_doc = retrieve(user, state)
-#     state.update(ret_doc)
-#     print(generate(state))
