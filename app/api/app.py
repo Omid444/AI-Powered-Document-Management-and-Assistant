@@ -400,7 +400,11 @@ async def show_document(document_id:str, request: Request, authorization: str = 
         )
 
         v_db.delete(where=filters)
-        print("file_path: ",document["metadatas"][0]["file_path"])
+        db.query(models.models.UserDocumentMeta).filter(
+            (models.models.UserDocumentMeta.username == username) &
+            (models.models.UserDocumentMeta.document_id == document_id)
+        ).delete()
+
         file_path = document["metadatas"][0]["file_path"]
         try:
             if os.path.exists(file_path):
