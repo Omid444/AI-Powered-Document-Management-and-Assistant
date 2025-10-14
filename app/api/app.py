@@ -104,7 +104,6 @@ async def account(authorization: str = Header(None, alias="Authorization"),
     #retrieved_docs = lang_chain.retrieve_document(username, k=4)
     #print("retried_docs",retrieved_docs)
     retrieved_docs = lang_chain.retrieve_due_date_documents(username)
-    print("Authorization in account:", authorization)
     username = check_authorization(authorization)
     if username:
         if username is None:
@@ -130,7 +129,7 @@ async def account(authorization: str = Header(None, alias="Authorization"),
             "is_tax_related": meta.is_tax_related if meta else False
         }
         final_docs.append(enriched)
-    print("Final Doccccccccccc", final_docs)
+    #print("Final Doccccccccccc", final_docs)
     #print("***********This is retrieved docs",retrieved_docs)
     return {"firstname":user_firstname, "retrieved_docs":final_docs}
 
@@ -179,7 +178,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
     """
     Handle user chat requests and return an AI-generated reply.
     """
-    print("Authorization in api/chat:", authorization)
+    #print("Authorization in api/chat:", authorization)
     username = check_authorization(authorization)
     if username:
         data = await request.json()
@@ -201,7 +200,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
         lang_chain.state.update({"question": user_message})
         #print(lang_chain.state)
         retrieved_doc = lang_chain.retrieve_document(username)
-        print("____????????????? This is retrieve doc in chat",retrieved_doc)
+        #print("____????????????? This is retrieve doc in chat",retrieved_doc)
         lang_chain.state.update(retrieved_doc)
         reply = lang_chain.generate(retrieved_doc)
         ai_answer = reply["answer"]
@@ -225,7 +224,7 @@ async  def get_chat_history(authorization: str = Header(None, alias="Authorizati
         """
         Retrieve the last 10 chat conversations for the authorized user.
         """
-        print("Authorization in history of chatbot", authorization)
+        #print("Authorization in history of chatbot", authorization)
         username = check_authorization(authorization)
         if not username:
             raise HTTPException(status_code=401, detail="Unauthorized")
@@ -260,7 +259,7 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     Upload a PDF file, extract its content/metadata,
     store it in the vector DB, save copy of original file on disk and return a summary.
     """
-    print("Authorization file_upload:", authorization)
+    #print("Authorization file_upload:", authorization)
     username = check_authorization(authorization)
     if username:
         file_name = file.filename
@@ -268,8 +267,8 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
 
         # Pass this byte string to a new function to process and save it.
         file_content, meta_data = services.summarizer.extract_text_and_metadata(file_content_bytes)
-        #reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
-        reply = services.gemini_connection.file_upload_llm_gemini(file_content, meta_data)
+        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+        #reply = services.gemini_connection.file_upload_llm_gemini(file_content, meta_data)
         content, file_content, meta_data =services.app_services.file_upload(username=username, file_name=file_name, file_content=file_content,
                                                                             file_content_bytes=file_content_bytes, meta_data=meta_data,
                                                                             due_date=reply.due_date, is_payment=reply.is_payment, is_tax_related=reply.is_tax_related)

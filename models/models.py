@@ -37,7 +37,8 @@ class UserDocumentMeta(Base):
     document_id = Column(String, index=True, nullable=False)
     is_tax_related = Column(Boolean, default=False)
     is_closed = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.now())
+    
 # class Document(Base):
 #     __tablename__ = "documents"
 #

@@ -3,12 +3,19 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional, Dict
-import json
+#from langfuse.openai import OpenAI
+from langfuse import get_client
+
 load_dotenv()
-apikey = os.getenv("OPENAI_KEY")
 
-client = OpenAI(api_key=os.getenv("OPENAI_KEY"))
 
+SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_HOS = os.getenv("LANGFUSE_HOS")
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+#langfuse = get_client()
 
 class DocumentSummary(BaseModel):
     title: str
@@ -25,15 +32,14 @@ def file_upload_llm(file_message, meta_data=""):
         messages=[
             {
                 "role": "system",
-                "content": f"You are a helpful assistant. answer in less than 500 words. at first explains in three or more lines (if needed) about this text."
-                " It is a document belongs to me, summarize this text for me to make it more simple and understandable"
-                f"use the metadata of document which is provided here:{meta_data} to provide detailed reply."
-                f"focus on important details of metadata more, something like due date or payment amount"
-                f"and remember always write it in second person format"
+                "content": f"You are a helpful assistant.\n"
+                " It is a document belongs to me, summarize this text for me to make it more simple and understandable\n"
+                f"focus on important details of metadata more, something like due date or payment amount\n"
+                f"and remember always write it in second person forma\nt"
                 f"also Return the result strictly in the defined JSON structure.\n"
                     "- title: A short title based on the text, String format\n"
-                    "- summary: A three-line or more explanation in second person format. Use provided metadata to improve accuracy. String Format\n"
-                    "- tags: dictionary of metadata. dictionary format"       
+                    "- summary: Use less than 100 words for summary. Use provided metadata to improve accuracy. String Format\n"
+                    "- tags: dictionary of metadata. dictionary format\n"       
                     "- is_payment: If  payment specified in document, write payment in float format(e.g. 120.0), otherwise null\n"
                     "_ is_tax_related: If document is tax related True (boolean format) otherwise null\n"
                     "- due_date: If the deadline date is specified in document for payment write date in date format in ISO format (YYYY-MM-DD), otherwise null\n"       
@@ -41,7 +47,7 @@ def file_upload_llm(file_message, meta_data=""):
             },
             {"role": "user", "content": file_message}
         ],
-        max_tokens=1000,
+        #max_tokens=1000,
         response_format=DocumentSummary,
     )
 

@@ -12,28 +12,29 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
-PROVIDER = "gemini"
-#PROVIDER = "openai"
-if PROVIDER == "openai":
-    if not os.environ.get("OPENAI_KEY"):
-        os.environ["OPENAI_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
-#llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+# print(os.getenv("OPENAI_API_KEY"))
+#PROVIDER = "gemini"
+# PROVIDER = "openai"
+# if PROVIDER == "openai":
+#     if not os.environ.get("OPENAI_API_KEY"):
+#         os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+# #llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-if PROVIDER == "gemini":
-    if not os.environ.get("GOOGLE_API_KEY"):   # ✅ Gemini
-        os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
+# elif PROVIDER == "gemini":
+#     if not os.environ.get("GOOGLE_API_KEY"):   # ✅ Gemini
+#         os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
-#llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-# emb = OpenAIEmbeddings(model="text-embedding-3-large")
+emb = OpenAIEmbeddings(model="text-embedding-3-large")
 #emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # ✅ Gemini
 
-if PROVIDER == "openai":
-    llm = init_chat_model("gpt-4o-mini", model_provider="openai")
-    emb = OpenAIEmbeddings(model="text-embedding-3-large")
-elif PROVIDER == "gemini":
-    llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   # ✅ Gemini LLM
-    emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+# if PROVIDER == "openai":
+#     llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+#     emb = OpenAIEmbeddings(model="text-embedding-3-large")
+# elif PROVIDER == "gemini":
+#     llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   # ✅ Gemini LLM
+#     emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Define state for application
 class State(TypedDict):
@@ -114,6 +115,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
             print("distance", distance)
             print("similarity_point", similarity_point)
             similarity = 1.0 - distance
+            print(similarity)
 
             if similarity >= similarity_point:
                 print(f"Document already exists with a similarity score of {similarity}.")
@@ -204,7 +206,7 @@ def retrieve_due_date_documents(username):
     }
     results = vector_store.get(where=filter_query)
     unique_docs = {}
-    print("-------resluts",results)
+    #print("-------resluts",results)
     for meta, doc in zip(results["metadatas"], results["documents"]):
         doc_id = meta.get("document_id")
         # Looking for starting_index with 0 value

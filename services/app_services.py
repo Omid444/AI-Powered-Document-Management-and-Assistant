@@ -1,4 +1,4 @@
-from io import BytesIO
+from datetime import datetime
 from jose import JWTError
 from fastapi import HTTPException, UploadFile
 from pathlib import Path
@@ -80,7 +80,18 @@ def file_upload(username, file_name, file_content,
                 file_content_bytes, meta_data,
                 due_date, is_payment, is_tax_related):
 
-
+    print(type(due_date))
+    if due_date:
+        if isinstance(due_date, datetime):
+            due_date = due_date.isoformat()
+        elif isinstance(due_date, (int, float)):
+            due_date = datetime.fromtimestamp(due_date).isoformat()
+        elif isinstance(due_date, str):
+            due_date = due_date
+        else:
+            raise ValueError(f"Invalid due_date type: {type(due_date)}")
+    else:
+        due_date = datetime.now().isoformat()
     # Check for duplicate document
     is_file_duplicate = check_for_duplicate_document(username, file_content)
     if is_file_duplicate:
@@ -102,5 +113,5 @@ def file_upload(username, file_name, file_content,
                            due_date=due_date, is_payment=is_payment, is_tax_related=is_tax_related)
         return content, file_content, meta_data
     except Exception as e:
-        content = "Error occurred in vector DB."
+        content = "Error occurred in vector DB." + str(e)
         return content, None, None
