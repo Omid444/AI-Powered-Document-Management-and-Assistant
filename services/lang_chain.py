@@ -21,19 +21,19 @@ load_dotenv()
 # #llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
 # elif PROVIDER == "gemini":
-#     if not os.environ.get("GOOGLE_API_KEY"):   # ✅ Gemini
+#     if not os.environ.get("GOOGLE_API_KEY"):   # Gemini
 #         os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
 llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
 emb = OpenAIEmbeddings(model="text-embedding-3-large")
-#emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # ✅ Gemini
+#emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  #  Gemini
 
 # if PROVIDER == "openai":
 #     llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 #     emb = OpenAIEmbeddings(model="text-embedding-3-large")
 # elif PROVIDER == "gemini":
-#     llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   # ✅ Gemini LLM
+#     llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   #  Gemini LLM
 #     emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Define state for application
@@ -186,7 +186,7 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, i
 
 
 
-def retrieve_document(username, state: State = state, k=1):
+def retrieve_document(username, state: State = state, k=5):
     vector_store = get_user_store(username, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k, filter={"username": username})
     return {"context": retrieved_docs}
@@ -226,7 +226,7 @@ def retrieve_due_date_documents(username):
 
 
 
-def generate(state: State):
+def generate(state: State = state):
     question = state.get("question", "")
     context_docs = state.get("context", [])
 
@@ -238,10 +238,14 @@ def generate(state: State):
 
     prompt = ChatPromptTemplate.from_messages([
         ("system",
-         "Use only the provided context and metadata (username, due_date, is_tax_related, "
-         "is_payment, etc.) carefully. "
-         "If the information is insufficient, ask a clarifying question. "
-         "Output must be ONLY the answer in a few sentences."),
+         "You are an adaptive assistant that answers based ONLY on the given context. "
+         "1.️ If the question requests specific data (like email addresses, amounts, dates, IDs, names, etc.), "
+         "extract them exactly as they appear in the context, without extra text. "
+         "2.️ If the question is general (like asking for summaries, insights, or explanations), "
+         "respond with a short and clear paragraph summarizing or explaining. "
+         "3.️ if question is not about document and its content, reply it based on your knowledge "
+         "If no relevant information is found, say 'No relevant information found.'"),
+
         ("human", "Question: {question}\n\nContext:\n{context}")
     ])
 

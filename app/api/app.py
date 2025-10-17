@@ -8,7 +8,7 @@ from fastapi import  Request, Depends, Header, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from models.models import User, Chat, UserDocumentMeta
 from sqlalchemy.orm import Session
-from sqlalchemy import select, asc
+from sqlalchemy import select, asc, desc
 from services import lang_chain, summarizer
 from fastapi.responses import FileResponse
 from services.app_services import check_authorization
@@ -202,7 +202,7 @@ async def chat(request: Request, authorization: str = Header(None, alias="Author
         retrieved_doc = lang_chain.retrieve_document(username)
         #print("____????????????? This is retrieve doc in chat",retrieved_doc)
         lang_chain.state.update(retrieved_doc)
-        reply = lang_chain.generate(retrieved_doc)
+        reply = lang_chain.generate()
         ai_answer = reply["answer"]
         assistant_chat_entry = Chat(
             user_id=user_id,
@@ -232,8 +232,10 @@ async  def get_chat_history(authorization: str = Header(None, alias="Authorizati
         user = db.scalar(select(User).where(User.username == username))
         if not user:
             return []  # Return an empty list if user is not found
-        query = select(Chat).where(Chat.user_id == user.id).order_by(asc(Chat.timestamp)).limit(50)
-        chat_entries = db.scalars(query).all()
+        query = select(Chat).where(Chat.user_id == user.id).order_by(desc(Chat.timestamp)).limit(50)
+        chat_entries = db.execute(query).scalars().all()
+        chat_entries.reverse()
+        #chat_entries = db.scalars(query).all()
         #chat_entries = sorted(user.chats, key=lambda c:c.timestamp)[:50]
 
         # Convert the SQLAlchemy objects to a list of dictionaries for JSON serialization
