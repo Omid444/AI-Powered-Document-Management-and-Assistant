@@ -1,24 +1,40 @@
 import getpass
 import os, re ,uuid
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
+# print(os.getenv("OPENAI_API_KEY"))
+#PROVIDER = "gemini"
+# PROVIDER = "openai"
+# if PROVIDER == "openai":
+#     if not os.environ.get("OPENAI_API_KEY"):
+#         os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+# #llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
-if not os.environ.get("OPENAI_KEY"):
-  os.environ["OPENAI_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+# elif PROVIDER == "gemini":
+#     if not os.environ.get("GOOGLE_API_KEY"):   # Gemini
+#         os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
 llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 
 emb = OpenAIEmbeddings(model="text-embedding-3-large")
+#emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  #  Gemini
 
+# if PROVIDER == "openai":
+#     llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+#     emb = OpenAIEmbeddings(model="text-embedding-3-large")
+# elif PROVIDER == "gemini":
+#     llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai")   #  Gemini LLM
+#     emb = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Define state for application
 class State(TypedDict):
@@ -99,6 +115,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
             print("distance", distance)
             print("similarity_point", similarity_point)
             similarity = 1.0 - distance
+            print(similarity)
 
             if similarity >= similarity_point:
                 print(f"Document already exists with a similarity score of {similarity}.")
@@ -134,7 +151,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
     return False
 
 
-def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
+def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, is_payment, is_tax_related, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
 
     vector_store = get_user_store(username, emb=emb)
     text_splitter = RecursiveCharacterTextSplitter(
@@ -154,6 +171,12 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size:
         chunk.metadata["source_key"] = create_source_key(username,file_name)
         chunk.metadata["file_name"] = file_name
         chunk.metadata["file_path"] = str(file_path)
+        chunk.metadata["due_date"] = due_date
+        chunk.metadata["due_date_ts"] = datetime.fromisoformat(due_date).timestamp()
+        chunk.metadata["is_payment"] = is_payment
+        chunk.metadata["is_tax_related"] = is_tax_related
+        chunk.metadata["is_closed"] = False
+
 
     vector_store.add_documents(chunks)
     #Persist to disk so the index survives restarts
@@ -162,51 +185,72 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, chunk_size:
     return len(chunks)
 
 
-# Define application steps
-def retrieve_document(username, state: State = state, k=1):
+
+def retrieve_document(username, state: State = state, k=5):
     vector_store = get_user_store(username, emb=emb)
     retrieved_docs = vector_store.similarity_search(state["question"], k=k, filter={"username": username})
     return {"context": retrieved_docs}
 
 
-def generate(state: State=state):
-    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+def retrieve_due_date_documents(username):
+    vector_store = get_user_store(username, emb=emb)
+    today = datetime.now()
+    a_month_from_now = today + timedelta(days=30)
+    filter_query = {
+        "$and": [
+            {"username": username},
+            {"due_date_ts": {"$gte": today.timestamp()}},
+            {"due_date_ts": {"$lte": a_month_from_now.timestamp()}},
+            {"is_closed": False}
+        ]
+    }
+    results = vector_store.get(where=filter_query)
+    unique_docs = {}
+    #print("-------resluts",results)
+    for meta, doc in zip(results["metadatas"], results["documents"]):
+        doc_id = meta.get("document_id")
+        # Looking for starting_index with 0 value
+        if meta.get("start_index", 9999) == 0:
+            unique_docs[doc_id] = {
+                "metadata": meta,
+                "document": doc
+            }
+        # If starting_index with 0 value not found
+        elif doc_id not in unique_docs:
+            unique_docs[doc_id] = {
+                "metadata": meta,
+                "document": doc
+            }
+
+    return list(unique_docs.values())
+
+
+
+def generate(state: State = state):
+    question = state.get("question", "")
+    context_docs = state.get("context", [])
+
+    docs_content = []
+    for doc in context_docs:
+        meta_str = "\n".join([f"{k}: {v}" for k, v in (doc.metadata or {}).items()])
+        docs_content.append(f"Metadata:\n{meta_str}\n\nContent:\n{doc.page_content}")
+    docs_content = "\n\n".join(docs_content)
+
     prompt = ChatPromptTemplate.from_messages([
-    ("system", "Use only the provided context. "
-               "If insufficient, ask related question to gather more information that you need "
-               "Output must be ONLY the answer in a few sentences)."),
-    ("human",  "Question: {question}\n\nContext:\n{context}")
-])
-    messages = prompt.invoke({"question": state["question"], "context": docs_content})
+        ("system",
+         "You are an adaptive assistant that answers based ONLY on the given context. "
+         "1.️ If the question requests specific data (like email addresses, amounts, dates, IDs, names, etc.), "
+         "extract them exactly as they appear in the context, without extra text. "
+         "2.️ If the question is general (like asking for summaries, insights, or explanations), "
+         "respond with a short and clear paragraph summarizing or explaining. "
+         "3.️ if question is not about document and its content, reply it based on your knowledge "
+         "If no relevant information is found, say 'No relevant information found.'"),
+
+        ("human", "Question: {question}\n\nContext:\n{context}")
+    ])
+
+    messages = prompt.invoke({"question": question, "context": docs_content})
     response = llm.invoke(messages)
     return {"answer": response.content}
 
 
-# Compile application and test
-# graph_builder = StateGraph(State).add_sequence([retrieve, generate])
-# graph_builder.add_edge(START, "retrieve")
-# graph = graph_builder.compile()
-
-# if __name__ == "__main__":
-#     user = "test_user"
-#
-#
-#     raw_text = """
-#     my name is kulo I live in tourta. I am 25 yearsoll.
-#     I love island.
-#     """
-#
-#     # ۱) تبدیل متن به بردار و ذخیره
-#     chunks_count = turn_txt_to_vector(user, raw_text)
-#     print(f"✅ {chunks_count} chunks added to vector store.")
-#
-#     # ۲) ساخت State اولیه
-#     state: State = {
-#         "question": "where do I live?",
-#         "context": [],
-#         "answer": ""
-#     }
-#
-#     ret_doc = retrieve(user, state)
-#     state.update(ret_doc)
-#     print(generate(state))
