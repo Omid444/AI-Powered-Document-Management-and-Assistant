@@ -235,8 +235,7 @@ async  def get_chat_history(authorization: str = Header(None, alias="Authorizati
         query = select(Chat).where(Chat.user_id == user.id).order_by(desc(Chat.timestamp)).limit(50)
         chat_entries = db.execute(query).scalars().all()
         chat_entries.reverse()
-        #chat_entries = db.scalars(query).all()
-        #chat_entries = sorted(user.chats, key=lambda c:c.timestamp)[:50]
+
 
         # Convert the SQLAlchemy objects to a list of dictionaries for JSON serialization
         history = [
