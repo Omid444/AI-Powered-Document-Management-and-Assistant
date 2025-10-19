@@ -38,10 +38,14 @@ def get_db():
 def create_file_path(user_name, file_name):
     user_dir = BASE_DIR / "uploads" /user_name
     user_dir.mkdir(parents=True, exist_ok=True)
-    ext = Path(file_name).suffix
-    file_path = user_dir / f"{create_source_key(username=user_name, file_name=file_name)}"
-    return file_path
+    ext = Path(file_name).suffix.lstrip(".").lower()
+    base_name = Path(file_name).stem  # without extension
+    # Make a unique name
+    source_key = create_source_key(username=user_name, file_name=base_name)
+    # final path + extention
+    file_path = user_dir / f"{source_key}.{ext}"
 
+    return str(file_path)
 
 
 def save_file(file_bytes, file_path):
@@ -55,8 +59,6 @@ def save_file(file_bytes, file_path):
         return f"Error occurred while copying file: {e}"
 
 
-# def insert_document():
-#     """Insert document properties in documents table."""
 
 
 
@@ -101,6 +103,7 @@ def file_upload(username, file_name, file_content,
         return content, None, None
 
     file_path = create_file_path(username, file_name)
+    print("file_path", file_path)
 
     # Pass the byte string to the save function.
     is_file_saved = save_file(file_content_bytes, file_path)

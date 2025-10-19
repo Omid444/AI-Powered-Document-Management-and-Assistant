@@ -1,5 +1,9 @@
 import os.path
 import uuid
+import mimetypes
+from PIL import Image
+import pytesseract
+import io
 from datetime import datetime
 from services.app_services import app, templates, get_db
 import models.schemas
@@ -264,14 +268,33 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     username = check_authorization(authorization)
     if username:
         file_name = file.filename
-        file_content_bytes = file.file.read()
+        file_name_extension = file_name.lower().rsplit('.', 1)[-1]
+        file_content_bytes = await file.read()
+        raw_bytes_copy = file_content_bytes[:]
+        if file_name_extension == "pdf":
 
-        # Pass this byte string to a new function to process and save it.
-        file_content, meta_data = services.summarizer.extract_text_and_metadata(file_content_bytes)
-        reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
-        #reply = services.gemini_connection.file_upload_llm_gemini(file_content, meta_data)
+            # Pass this byte string to a new function to process and save it.
+            file_content, meta_data = services.summarizer.extract_text_and_metadata(file_content_bytes)
+            reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+            # reply = services.gemini_connection.file_upload_llm_gemini(file_content, meta_data)
+
+        elif file_name_extension in ["png", "jpg", "jpeg", "tiff", "bmp", "gif"]:
+            try:
+                image = Image.open(io.BytesIO(file_content_bytes))
+                file_content = pytesseract.image_to_string(image)
+                print("File content", file_content)
+                meta_data = {"source": file_name, "type": "image"}
+                reply = services.open_ai_connection.file_upload_llm(file_content, meta_data)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error reading image: {str(e)}")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Only PDF or image files are allowed.")
+
+
+
         content, file_content, meta_data =services.app_services.file_upload(username=username, file_name=file_name, file_content=file_content,
-                                                                            file_content_bytes=file_content_bytes, meta_data=meta_data,
+                                                                            file_content_bytes=raw_bytes_copy, meta_data=meta_data,
                                                                             due_date=reply.due_date, is_payment=reply.is_payment, is_tax_related=reply.is_tax_related)
         user_id = db.query(models.models.User.id).filter(models.models.User.username == username).scalar()
         conversation_id = str(uuid.uuid4())
@@ -364,13 +387,19 @@ async def show_document(document_id:str, authorization: str = Header(None, alias
         document = v_db.get(
             where=filters
         )
-        print("file_path: ",document["metadatas"][0]["file_path"])
+
         file_path = document["metadatas"][0]["file_path"]
-        #return templates.TemplateResponse("dashboard.html", {"request": request, "document": "This is test"})
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        # Using mimetype to findout type of files
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
         try:
             return FileResponse(
                 file_path,
-                media_type="application/pdf"
+                media_type=mime_type,
+                filename=os.path.basename(file_path)
             )
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="File not found")
@@ -433,6 +462,6 @@ async def upload_file_button(file: UploadFile = File(...),authorization: str = H
 
 
 # if __name__ == "__main__":
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
+#     uvicorn.run("app.api.app:app", host="127.0.0.1", port=8000, reload=True)
 
-# uvicorn app.api.app:app --reload
+#uvicorn app.api.app:app --reload
