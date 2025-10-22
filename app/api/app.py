@@ -101,12 +101,6 @@ async def account(authorization: str = Header(None, alias="Authorization"),
     Render the account page for the authenticated user.
     """
     username = check_authorization(authorization)
-
-    # lang_chain.state.update({"question": f"Today date is {current_date} I need to find every documents that their due_date"
-    #                                      f"is one month later of today.each document must have different document_id."
-    #                                      f"if due_date is None or null or empty do not return"})
-    #retrieved_docs = lang_chain.retrieve_document(username, k=4)
-    #print("retried_docs",retrieved_docs)
     retrieved_docs = lang_chain.retrieve_due_date_documents(username)
     username = check_authorization(authorization)
     if username:
@@ -120,7 +114,6 @@ async def account(authorization: str = Header(None, alias="Authorization"),
         doc_id = doc["metadata"]["document_id"]
         meta = metas.get(doc_id)
 
-        # اگر در جدول بسته شده بود → ردش کن
         if meta and meta.is_closed:
             continue
 
@@ -133,8 +126,6 @@ async def account(authorization: str = Header(None, alias="Authorization"),
             "is_tax_related": meta.is_tax_related if meta else False
         }
         final_docs.append(enriched)
-    #print("Final Doccccccccccc", final_docs)
-    #print("***********This is retrieved docs",retrieved_docs)
     return {"firstname":user_firstname, "retrieved_docs":final_docs}
 
 
@@ -171,7 +162,7 @@ async def close_alert(document_id: str,
         meta = UserDocumentMeta(username=username, document_id=document_id, is_closed=True)
         db.add(meta)
     else:
-        meta.is_closed = True
+        meta.is_alert_closed = True
     db.commit()
     return {"document_id": document_id, "is_closed": True}
 
@@ -253,7 +244,6 @@ async  def get_chat_history(authorization: str = Header(None, alias="Authorizati
             }
             for chat in chat_entries
         ]
-        #print("*************This is history: ",history)
         return history
 
 
@@ -264,7 +254,6 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
     Upload a PDF file, extract its content/metadata,
     store it in the vector DB, save copy of original file on disk and return a summary.
     """
-    #print("Authorization file_upload:", authorization)
     username = check_authorization(authorization)
     if username:
         file_name = file.filename
@@ -360,10 +349,9 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
             if meta_sql.is_closed is not None:
                 meta_data["is_closed"] = meta_sql.is_closed
 
-            # فقط سندهای باز (is_closed = False)
-        if not meta_data["is_closed"]:
+
+
             metadata_unique_list.append(meta_data)
-        #return templates.TemplateResponse("dashboard.html",{"request": request,"firstname": user_firstname.title(), "documents": {"metadatas": metadata_unique_list}})
     return {"documents":metadata_unique_list}
 
 

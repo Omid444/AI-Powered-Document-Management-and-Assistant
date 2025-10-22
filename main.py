@@ -1,4 +1,5 @@
 from db.database import engine, Base
+from models.models import User, Chat, UserDocumentMeta
 from dotenv import load_dotenv
 import os
 
