@@ -9,7 +9,7 @@ from langchain_chroma import Chroma
 from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
 
 load_dotenv()
 # print(os.getenv("OPENAI_API_KEY"))

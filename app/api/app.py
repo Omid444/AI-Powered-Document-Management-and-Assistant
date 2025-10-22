@@ -351,7 +351,7 @@ async def show_dashboard(request: Request, authorization: str = Header(None, ali
 
 
 
-            metadata_unique_list.append(meta_data)
+        metadata_unique_list.append(meta_data)
     return {"documents":metadata_unique_list}
 
 

@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional, Dict
 #from langfuse.openai import OpenAI
-from langfuse import get_client
 
 load_dotenv()
 
