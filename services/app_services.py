@@ -116,5 +116,6 @@ def file_upload(username, file_name, file_content,
                            due_date=due_date, is_payment=is_payment, is_tax_related=is_tax_related)
         return content, file_content, meta_data
     except Exception as e:
+        print("content",content)
         content = "Error occurred in vector DB." + str(e)
         return content, None, None

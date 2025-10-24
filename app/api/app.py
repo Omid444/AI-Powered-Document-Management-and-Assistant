@@ -30,12 +30,6 @@ app.add_middleware(CORSMiddleware, allow_origins=origins,
 
 
 
-# @app.get("/", response_class=HTMLResponse)
-# async def read_root(request: Request):
-#     """
-#     Render the home page with a greeting message.
-#     """
-#     return templates.TemplateResponse("home.html", {"request": request, "message": "Hello, World!"})
 
 
 
@@ -162,7 +156,7 @@ async def close_alert(document_id: str,
         meta = UserDocumentMeta(username=username, document_id=document_id, is_closed=True)
         db.add(meta)
     else:
-        meta.is_alert_closed = True
+        meta.is_closed = True
     db.commit()
     return {"document_id": document_id, "is_closed": True}
 
@@ -259,7 +253,7 @@ async def upload(file: UploadFile = File(...), authorization: str = Header(None,
         file_name = file.filename
         file_name_extension = file_name.lower().rsplit('.', 1)[-1]
         file_content_bytes = await file.read()
-        raw_bytes_copy = file_content_bytes[:]
+        raw_bytes_copy = file_content_bytes[:] #Creating copy of  file_content_bytes
         if file_name_extension == "pdf":
 
             # Pass this byte string to a new function to process and save it.

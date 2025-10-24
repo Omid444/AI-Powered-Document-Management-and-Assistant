@@ -152,7 +152,7 @@ def check_for_duplicate_document(username, raw_document: str, emb=emb, similarit
 
 
 def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, is_payment, is_tax_related, chunk_size: int = 1000, chunk_overlap: int = 200, emb=emb) ->int:
-
+    print("omid1")
     vector_store = get_user_store(username, emb=emb)
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, # chunk size (characters)
@@ -163,6 +163,7 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, i
     if not chunks:
         print("Error: Document is empty or could not be processed.")
         return 0
+    print("omid2")
     document_id = str(uuid.uuid4())
     for chunk in chunks:
         # Generate a unique ID for the document
@@ -180,8 +181,9 @@ def turn_txt_to_vector(username, raw_document, file_name, file_path, due_date, i
 
     vector_store.add_documents(chunks)
     #Persist to disk so the index survives restarts
-    vector_store.persist()
-
+    print("omid3")
+    #vector_store.
+    print("omid4")
     return len(chunks)
 
 
@@ -238,7 +240,7 @@ def generate(state: State = state):
 
     prompt = ChatPromptTemplate.from_messages([
         ("system",
-         "You are an adaptive assistant that answers based ONLY on the given context. "
+         "You are an adaptive assistant that answers based ONLY on the given context. answer always in English even context is in another language."
          "1.️ If the question requests specific data (like email addresses, amounts, dates, IDs, names, etc.), "
          "extract them exactly as they appear in the context, without extra text. "
          "2.️ If the question is general (like asking for summaries, insights, or explanations), "
