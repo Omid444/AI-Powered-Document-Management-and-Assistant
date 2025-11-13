@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse
 from services.app_services import check_authorization
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from services.speech_to_text import speech_to_text_service
+from services.text_to_speech import text_to_speech_service
 
 origins = [
     "http://localhost:4200",
@@ -28,8 +30,52 @@ app.add_middleware(CORSMiddleware, allow_origins=origins,
                allow_credentials=True,allow_methods=["*"],
                allow_headers=["*"])
 
+# ============================
+#   Speech → Text (STT)
+# ============================
+@app.post("/speech-to-text")
+async def speech_to_text(audio: UploadFile = File(...)):
+    """
+    Accepts a webm audio file and returns transcribed text using OpenAI Whisper.
+    """
+    try:
+        # Ensure correct type
+        if audio.content_type not in ["audio/webm", "audio/mp4", "audio/mpeg", "audio/wav"]:
+            raise HTTPException(status_code=400, detail="Invalid audio format")
+
+        audio_bytes = await audio.read()   # read into memory
+
+        text = await speech_to_text_service(audio_bytes)
+
+        return {"text": text}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================
+#   Text → Speech (TTS)
+# ============================
+@app.post("/text-to-speech")
+async def text_to_speech(payload: dict):
+    """
+    Accepts text and returns a JSON with:
+    {
+        'text': ...,
+        'audio': Base64_encoded_mp3
+    }
+    """
+    try:
+        text = payload.get("text")
+        if not text:
+            raise HTTPException(status_code=400, detail="Text field is required.")
+
+        result = await text_to_speech_service(text)
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
