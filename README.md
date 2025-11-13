@@ -10,7 +10,7 @@ An intelligent, FastAPI-based system that helps you manage, summarize, search, a
 - Automatically summarizes uploaded documents in any language.
 - Extracts and stores metadata:
   - **Institution** (e.g., bank, insurance company)
-  - **Document Type** (e.g., invoice, legal, contract)
+  - **Document Type** (e.g., invoice, legal, contract)PDF or Image
   - **Payment status**
   - **Tax relevance**
   - **Deadlines or expiration dates**
@@ -45,10 +45,10 @@ An intelligent, FastAPI-based system that helps you manage, summarize, search, a
 ## Tech Stack
 
 - **Backend**: FastAPI
-- **Database**: SQLite via SQLAlchemy
+- **Database**: SQLite via SQLAlchemy, Chroma DB
 - **Authentication**: JWT + bcrypt
 - **Templating**: Jinja2
-- **Frontend**: HTML/CSS/JavaScript
+- **Frontend**: HTML/CSS/Typescript with Angular
 - **Upcoming**: Integration with **RAG (Retrieval-Augmented Generation)** for deeper document insights
 
 ---
@@ -129,20 +129,26 @@ uvicorn==0.35.0
 # Activate virtual environment if not already
 source venv/bin/activate
 
-# Run the app with uvicorn
+# Run the app with uvicorn for Backend:
 uvicorn app.api.app:app --reload
+Access at: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+
+# Run the app with ng for frontend:
+ng serve
+(you can find frontend code below:
+https://github.com/Omid444/ai-assistant-ui)
 ```
 
-Access at: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+
 
 ---
 
 ## Future Plans
 
-- Add **vector database (e.g., FAISS / Chroma)** for document embedding.
-- Integrate **RAG** with local LLM or OpenAI APIs.
-- Role-based access control and admin panel.
-- Deploy via Docker & CI/CD.
+- Whatsapp or Telegram Notification
+- Voice Recognition with nltk
+- Connect with personal Calender
+
 
 ---
 
