@@ -49,7 +49,7 @@ An intelligent, FastAPI-based system that helps you manage, summarize, search, a
 - **Authentication**: JWT + bcrypt
 - **Templating**: Jinja2
 - **Frontend**: HTML/CSS/Typescript with Angular
-- **Upcoming**: Integration with **RAG (Retrieval-Augmented Generation)** for deeper document insights
+- **Vector Database**: Integration with **RAG (Retrieval-Augmented Generation)** for deeper document insights
 
 ---
 
